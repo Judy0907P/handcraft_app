@@ -35,6 +35,30 @@ class PartResponse(PartBase):
         from_attributes = True
 
 
+# Recipe Schemas (defined first because ProductCreate references RecipeLineBase)
+class RecipeLineBase(BaseModel):
+    part_id: UUID
+    quantity: Decimal = Field(gt=0)
+    unit: Optional[str] = None
+
+
+class RecipeLineCreate(RecipeLineBase):
+    product_id: UUID
+
+
+class RecipeLineResponse(RecipeLineBase):
+    product_id: UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class RecipeLineUpdate(BaseModel):
+    quantity: Optional[Decimal] = Field(None, gt=0)
+    unit: Optional[str] = None
+
+
 # Product Schemas
 class ProductBase(BaseModel):
     name: str
@@ -54,6 +78,7 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     org_id: UUID
+    recipe_lines: Optional[List[RecipeLineBase]] = Field(None, description="Optional recipe lines to create with the product")
 
 
 class ProductUpdate(BaseModel):
@@ -70,6 +95,7 @@ class ProductUpdate(BaseModel):
     base_price: Optional[Decimal] = Field(None, ge=0)
     image_url: Optional[str] = None
     notes: Optional[str] = None
+    recipe_lines: Optional[List[RecipeLineBase]] = Field(None, description="Optional recipe lines to replace all existing recipe lines")
 
 
 class ProductResponse(ProductBase):
@@ -77,25 +103,7 @@ class ProductResponse(ProductBase):
     org_id: UUID
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-# Recipe Schemas
-class RecipeLineBase(BaseModel):
-    part_id: UUID
-    quantity: Decimal = Field(gt=0)
-    unit: Optional[str] = None
-
-
-class RecipeLineCreate(RecipeLineBase):
-    product_id: UUID
-
-
-class RecipeLineResponse(RecipeLineBase):
-    product_id: UUID
-    created_at: datetime
+    recipe_lines: Optional[List[RecipeLineResponse]] = None
     
     class Config:
         from_attributes = True

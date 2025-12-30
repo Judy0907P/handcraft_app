@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from uuid import UUID
 from decimal import Decimal
-from app.models import Part, Product, InventoryTransaction, Sale
+from app.models import Part, Product, InventoryTransaction, Sale, RecipeLine
 from app.schemas import PartCreate, ProductCreate, SaleCreate, BuildProductRequest
 
 
@@ -48,7 +48,7 @@ def update_part(db: Session, part_id: UUID, part_update: dict) -> Part:
 
 
 def create_product(db: Session, product: ProductCreate) -> Product:
-    """Create a new product"""
+    """Create a new product with optional recipe lines"""
     db_product = Product(
         org_id=product.org_id,
         name=product.name,
@@ -66,6 +66,26 @@ def create_product(db: Session, product: ProductCreate) -> Product:
         notes=product.notes
     )
     db.add(db_product)
+    db.flush()  # Flush to get product_id
+    
+    # Create recipe lines if provided
+    if product.recipe_lines:
+        for recipe_line in product.recipe_lines:
+            # Verify part exists and belongs to same org
+            part = db.query(Part).filter(Part.part_id == recipe_line.part_id).first()
+            if not part:
+                raise ValueError(f"Part {recipe_line.part_id} not found")
+            if part.org_id != product.org_id:
+                raise ValueError(f"Part {recipe_line.part_id} does not belong to the same organization")
+            
+            db_recipe_line = RecipeLine(
+                product_id=db_product.product_id,
+                part_id=recipe_line.part_id,
+                quantity=recipe_line.quantity,
+                unit=recipe_line.unit
+            )
+            db.add(db_recipe_line)
+    
     db.commit()
     db.refresh(db_product)
     return db_product

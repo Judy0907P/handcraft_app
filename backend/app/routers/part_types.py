@@ -85,3 +85,51 @@ def get_part_subtype(subtype_id: UUID, db: Session = Depends(get_db)):
         )
     return subtype
 
+
+@router.delete("/{type_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_part_type(type_id: UUID, db: Session = Depends(get_db)):
+    """Delete a part type (cascades to subtypes)"""
+    from app.models import PartType
+    
+    part_type = db.query(PartType).filter(PartType.type_id == type_id).first()
+    if not part_type:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Part type not found"
+        )
+    
+    try:
+        db.delete(part_type)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to delete part type: {str(e)}"
+        )
+
+
+@router.delete("/subtypes/{subtype_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_part_subtype(subtype_id: UUID, db: Session = Depends(get_db)):
+    """Delete a part subtype (will set parts' subtype_id to NULL)"""
+    from app.models import PartSubtype, Part
+    
+    subtype = db.query(PartSubtype).filter(PartSubtype.subtype_id == subtype_id).first()
+    if not subtype:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Part subtype not found"
+        )
+    
+    try:
+        db.delete(subtype)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to delete part subtype: {str(e)}"
+        )
+

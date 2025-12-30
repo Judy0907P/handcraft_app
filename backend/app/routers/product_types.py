@@ -87,3 +87,51 @@ def get_product_subtype(product_subtype_id: UUID, db: Session = Depends(get_db))
         )
     return subtype
 
+
+@router.delete("/{product_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_type(product_type_id: UUID, db: Session = Depends(get_db)):
+    """Delete a product type (cascades to subtypes)"""
+    from app.models import ProductType
+    
+    product_type = db.query(ProductType).filter(ProductType.product_type_id == product_type_id).first()
+    if not product_type:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product type not found"
+        )
+    
+    try:
+        db.delete(product_type)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to delete product type: {str(e)}"
+        )
+
+
+@router.delete("/subtypes/{product_subtype_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_subtype(product_subtype_id: UUID, db: Session = Depends(get_db)):
+    """Delete a product subtype (will set products' product_subtype_id to NULL)"""
+    from app.models import ProductSubtype
+    
+    subtype = db.query(ProductSubtype).filter(ProductSubtype.product_subtype_id == product_subtype_id).first()
+    if not subtype:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product subtype not found"
+        )
+    
+    try:
+        db.delete(subtype)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to delete product subtype: {str(e)}"
+        )
+
