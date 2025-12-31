@@ -27,10 +27,10 @@ CREATE TABLE IF NOT EXISTS products (
   org_id UUID NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
 
   name TEXT NOT NULL,
-  description TEXT NOT NULL,
+  description TEXT,
 
-  primary_color TEXT NOT NULL,
-  secondary_color TEXT NOT NULL,
+  primary_color TEXT,
+  secondary_color TEXT,
 
   -- NULL = Uncategorized
   product_subtype_id UUID REFERENCES product_subtypes(product_subtype_id) ON DELETE SET NULL,

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 from app.database import get_db
 from app import schemas, services
+from app.storage import storage_service
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -136,6 +137,71 @@ def update_product(product_id: UUID, product_update: schemas.ProductUpdate, db: 
     return product
 
 
+@router.post("/{product_id}/image", response_model=schemas.ProductResponse)
+def upload_product_image(
+    product_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload an image for a product"""
+    # Validate file type
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image"
+        )
+    
+    # Get the product
+    from app.models import Product
+    product = db.query(Product).filter(Product.product_id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
+    # Delete old image if exists
+    if product.image_url:
+        storage_service.delete_product_image(product.image_url)
+    
+    # Save new image
+    try:
+        image_url = storage_service.save_product_image(file, str(product_id))
+        
+        # Update product with new image URL
+        product.image_url = image_url
+        db.commit()
+        db.refresh(product)
+        
+        return product
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload image: {str(e)}"
+        )
+
+
+@router.delete("/{product_id}/image", response_model=schemas.ProductResponse)
+def delete_product_image(product_id: UUID, db: Session = Depends(get_db)):
+    """Delete the image for a product"""
+    from app.models import Product
+    product = db.query(Product).filter(Product.product_id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
+    if product.image_url:
+        storage_service.delete_product_image(product.image_url)
+        product.image_url = None
+        db.commit()
+        db.refresh(product)
+    
+    return product
+
+
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: UUID, db: Session = Depends(get_db)):
     """Delete a product (cascades to recipe lines)"""
@@ -147,6 +213,10 @@ def delete_product(product_id: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
+    
+    # Delete associated image if exists
+    if product.image_url:
+        storage_service.delete_product_image(product.image_url)
     
     try:
         db.delete(product)

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from app.routers import parts, products, production, sales, analytics, organizations, part_types, product_types, recipes, auth, part_status_labels
+from app.routers import parts, products, production, sales, analytics, organizations, part_types, product_types, recipes, auth, part_status_labels, product_status_labels
 
 app = FastAPI(
     title="Handcraft Management API",
@@ -31,6 +31,7 @@ app.include_router(production.router)
 app.include_router(sales.router)
 app.include_router(analytics.router)
 app.include_router(part_status_labels.router)
+app.include_router(product_status_labels.router)
 
 # Mount static files for uploaded images
 uploads_dir = Path("uploads")

@@ -104,9 +104,9 @@ class RecipeLineUpdate(BaseModel):
 # Product Schemas
 class ProductBase(BaseModel):
     name: str
-    description: str
-    primary_color: str
-    secondary_color: str
+    description: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
     product_subtype_id: Optional[UUID] = None
     status: List[str] = Field(default_factory=list)
     is_self_made: bool

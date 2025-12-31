@@ -144,9 +144,9 @@ export const productsApi = {
   create: (data: {
     org_id: string;
     name: string;
-    description: string;
-    primary_color: string;
-    secondary_color: string;
+    description?: string;
+    primary_color?: string;
+    secondary_color?: string;
     product_subtype_id?: string;
     status: string[];
     is_self_made: boolean;
@@ -159,6 +159,30 @@ export const productsApi = {
   }) => api.post<Product>('/products/', data),
   update: (productId: string, data: Partial<Product>) => api.patch<Product>(`/products/${productId}`, data),
   delete: (productId: string) => api.delete(`/products/${productId}`),
+  uploadImage: (productId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<Product>(`/products/${productId}/image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  deleteImage: (productId: string) => api.delete<Product>(`/products/${productId}/image`),
+};
+
+// Product Status Labels
+export interface ProductStatusLabel {
+  label_id: string;
+  org_id: string;
+  label: string;
+  created_at: string;
+}
+
+export const productStatusLabelsApi = {
+  getAll: (orgId: string) => api.get<ProductStatusLabel[]>(`/product-status-labels/org/${orgId}`),
+  create: (data: { org_id: string; label: string }) => api.post<ProductStatusLabel>('/product-status-labels/', data),
+  delete: (labelId: string) => api.delete(`/product-status-labels/${labelId}`),
 };
 
 // Part Status Labels
