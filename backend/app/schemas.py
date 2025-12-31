@@ -1,8 +1,38 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
+
+
+# Auth Schemas
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=72, description="Password must be between 6 and 72 characters")
+    username: str = Field(min_length=3, max_length=50, description="Username must be between 3 and 50 characters. Can contain letters, numbers, and underscores.")
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: UUID
+    email: str
+    username: str
+
+
+class UserResponse(BaseModel):
+    user_id: UUID
+    email: str
+    username: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # Part Schemas

@@ -37,10 +37,10 @@ const SettingsPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <p className="text-gray-900">{user?.email}</p>
             </div>
-            {user?.display_name && (
+            {user?.username && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-                <p className="text-gray-900">{user.display_name}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <p className="text-gray-900">{user.username}</p>
               </div>
             )}
           </div>

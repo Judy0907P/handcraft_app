@@ -6,22 +6,41 @@ import { UserPlus } from 'lucide-react';
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  const validateUsername = (value: string) => {
+    if (value.length < 3) return false;
+    if (value.length > 50) return false;
+    return /^[a-zA-Z0-9_]+$/.test(value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    // Validate username (required)
+    if (!username) {
+      setError('Username is required.');
+      setLoading(false);
+      return;
+    }
+
+    if (!validateUsername(username)) {
+      setError('Username must be 3-50 characters and can only contain letters, numbers, and underscores.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await register(email, password, displayName);
+      await register(email, password, username);
       navigate('/orgs');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -47,17 +66,37 @@ const RegisterPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                Display Name
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                Username
               </label>
               <input
-                id="displayName"
+                id="username"
                 type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="John Doe"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                minLength={3}
+                maxLength={50}
+                pattern="[a-zA-Z0-9_]+"
+                className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                  username && !validateUsername(username) ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="johndoe"
               />
+              <div className="mt-1 text-xs text-gray-500">
+                <p>Username requirements:</p>
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  <li className={username.length >= 3 ? 'text-green-600' : 'text-red-600'}>
+                    At least 3 characters
+                  </li>
+                  <li className={username.length <= 50 ? 'text-green-600' : 'text-red-600'}>
+                    Maximum 50 characters
+                  </li>
+                  <li className={username.length === 0 || /^[a-zA-Z0-9_]+$/.test(username) ? 'text-green-600' : 'text-red-600'}>
+                    Only letters, numbers, and underscores allowed
+                  </li>
+                </ul>
+              </div>
             </div>
 
             <div>
@@ -85,9 +124,22 @@ const RegisterPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
+                maxLength={72}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="••••••••"
               />
+              <div className="mt-1 text-xs text-gray-500">
+                <p>Password requirements:</p>
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  <li className={password.length >= 6 ? 'text-green-600' : ''}>
+                    At least 6 characters
+                  </li>
+                  <li className={password.length <= 72 ? 'text-green-600' : 'text-red-600'}>
+                    Maximum 72 characters
+                  </li>
+                </ul>
+              </div>
             </div>
 
             <button

@@ -4,17 +4,31 @@ from typing import List
 from uuid import UUID
 from app.database import get_db
 from app import schemas
-from app.models import Organization
+from app.models import Organization, OrgMembership
+from app.routers.auth import get_current_user, User
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
 @router.post("/", response_model=schemas.OrganizationResponse, status_code=status.HTTP_201_CREATED)
-def create_organization(org: schemas.OrganizationCreate, db: Session = Depends(get_db)):
-    """Create a new organization"""
+def create_organization(
+    org: schemas.OrganizationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new organization and add current user as owner"""
     try:
         db_org = Organization(name=org.name)
         db.add(db_org)
+        db.flush()  # Flush to get org_id
+        
+        # Add user as owner
+        membership = OrgMembership(
+            org_id=db_org.org_id,
+            user_id=current_user.user_id,
+            role="owner"
+        )
+        db.add(membership)
         db.commit()
         db.refresh(db_org)
         return db_org
@@ -27,9 +41,18 @@ def create_organization(org: schemas.OrganizationCreate, db: Session = Depends(g
 
 
 @router.get("/", response_model=List[schemas.OrganizationResponse])
-def get_organizations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Get all organizations"""
-    return db.query(Organization).offset(skip).limit(limit).all()
+def get_organizations(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all organizations the current user is a member of"""
+    return db.query(Organization).join(
+        OrgMembership, Organization.org_id == OrgMembership.org_id
+    ).filter(
+        OrgMembership.user_id == current_user.user_id
+    ).offset(skip).limit(limit).all()
 
 
 @router.get("/{org_id}", response_model=schemas.OrganizationResponse)

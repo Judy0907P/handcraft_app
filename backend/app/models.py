@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Integer, Numeric, Boolean, Text, ForeignK
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.database import Base
 
@@ -14,8 +14,8 @@ class User(Base):
     email = Column(Text, nullable=False, unique=True)
     password_hash = Column(Text, nullable=False)
     display_name = Column(Text)
-    created_at = Column(Text, nullable=False, server_default=func.now())
-    last_login_at = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
     
     org_memberships = relationship("OrgMembership", back_populates="user")
 

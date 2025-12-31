@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
-  user: { email: string; display_name?: string } | null;
+  user: { email: string; username: string; user_id?: string } | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  register: (email: string, password: string, username: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -11,35 +12,74 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<{ email: string; display_name?: string } | null>(null);
-
-  useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    // TODO: Implement actual API call when backend auth is ready
-    // For now, just store in localStorage
-    const userData = { email, display_name: email.split('@')[0] };
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-  };
-
-  const register = async (email: string, password: string, displayName?: string) => {
-    // TODO: Implement actual API call when backend auth is ready
-    const userData = { email, display_name: displayName || email.split('@')[0] };
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-  };
+  const [user, setUser] = useState<{ email: string; username: string; user_id?: string } | null>(null);
 
   const logout = () => {
+    localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     localStorage.removeItem('currentOrg');
     setUser(null);
+  };
+
+  useEffect(() => {
+    // Check for stored token and user
+    const token = localStorage.getItem('access_token');
+    const storedUser = localStorage.getItem('user');
+    if (token && storedUser) {
+      setUser(JSON.parse(storedUser));
+      // Verify token is still valid by fetching user info
+      authApi.getMe()
+        .then((response) => {
+          const userData = {
+            email: response.data.email,
+            username: response.data.username,
+            user_id: response.data.user_id,
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        })
+        .catch(() => {
+          // Token invalid, clear storage
+          logout();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await authApi.login({ email, password });
+      const token = response.data.access_token;
+      const userData = {
+        email: response.data.email,
+        username: response.data.username,
+        user_id: response.data.user_id,
+      };
+      
+      localStorage.setItem('access_token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Login failed');
+    }
+  };
+
+  const register = async (email: string, password: string, username?: string) => {
+    try {
+      const response = await authApi.register({ email, password, username });
+      const token = response.data.access_token;
+      const userData = {
+        email: response.data.email,
+        username: response.data.username,
+        user_id: response.data.user_id,
+      };
+      
+      localStorage.setItem('access_token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Registration failed');
+    }
   };
 
   return (

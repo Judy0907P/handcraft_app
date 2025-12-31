@@ -19,6 +19,49 @@ const api = axios.create({
   },
 });
 
+// Add token to requests if available
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Auth API
+export interface RegisterData {
+  email: string;
+  password: string;
+  username: string;
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user_id: string;
+  email: string;
+  username: string;
+}
+
+export const authApi = {
+  register: (data: RegisterData) => api.post<TokenResponse>('/auth/register', data),
+  login: (data: LoginData) => {
+    // OAuth2PasswordRequestForm uses form data with username/password
+    const formData = new URLSearchParams();
+    formData.append('username', data.email); // OAuth2 uses 'username' for email
+    formData.append('password', data.password);
+    return api.post<TokenResponse>('/auth/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  },
+  getMe: () => api.get<{ user_id: string; email: string; username: string; created_at: string }>('/auth/me'),
+};
+
 // Organizations
 export const organizationsApi = {
   getAll: () => api.get<Organization[]>('/organizations/'),

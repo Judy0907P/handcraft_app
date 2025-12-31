@@ -19,8 +19,8 @@ const LoginPage = () => {
     try {
       await login(email, password);
       navigate('/orgs');
-    } catch (err) {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
