@@ -1,0 +1,119 @@
+import axios from 'axios';
+import type {
+  Organization,
+  PartType,
+  PartSubtype,
+  Part,
+  ProductType,
+  ProductSubtype,
+  Product,
+  Sale,
+} from '../types';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Organizations
+export const organizationsApi = {
+  getAll: () => api.get<Organization[]>('/organizations/'),
+  getById: (orgId: string) => api.get<Organization>(`/organizations/${orgId}`),
+  create: (data: { name: string }) => api.post<Organization>('/organizations/', data),
+  delete: (orgId: string) => api.delete(`/organizations/${orgId}`),
+};
+
+// Part Types
+export const partTypesApi = {
+  getAll: (orgId: string) => api.get<PartType[]>(`/part-types/org/${orgId}`),
+  getById: (typeId: string) => api.get<PartType>(`/part-types/${typeId}`),
+  create: (data: { org_id: string; type_name: string }) => api.post<PartType>('/part-types/', data),
+  delete: (typeId: string) => api.delete(`/part-types/${typeId}`),
+};
+
+// Part Subtypes
+export const partSubtypesApi = {
+  getByType: (typeId: string) => api.get<PartSubtype[]>(`/part-types/subtypes/type/${typeId}`),
+  getById: (subtypeId: string) => api.get<PartSubtype>(`/part-types/subtypes/${subtypeId}`),
+  create: (data: { type_id: string; subtype_name: string }) => api.post<PartSubtype>('/part-types/subtypes', data),
+  delete: (subtypeId: string) => api.delete(`/part-types/subtypes/${subtypeId}`),
+};
+
+// Parts
+export const partsApi = {
+  getAll: (orgId: string, subtypeId?: string) => {
+    const params = subtypeId ? { subtype_id: subtypeId } : {};
+    return api.get<Part[]>(`/parts/org/${orgId}`, { params });
+  },
+  getById: (partId: string) => api.get<Part>(`/parts/${partId}`),
+  create: (data: {
+    org_id: string;
+    name: string;
+    stock: number;
+    unit_cost: string;
+    unit?: string;
+    subtype_id?: string;
+  }) => api.post<Part>('/parts/', data),
+  update: (partId: string, data: Partial<Part>) => api.patch<Part>(`/parts/${partId}`, data),
+  delete: (partId: string) => api.delete(`/parts/${partId}`),
+};
+
+// Product Types
+export const productTypesApi = {
+  getAll: (orgId: string) => api.get<ProductType[]>(`/product-types/org/${orgId}`),
+  getById: (typeId: string) => api.get<ProductType>(`/product-types/${typeId}`),
+  create: (data: { org_id: string; name: string; description?: string }) =>
+    api.post<ProductType>('/product-types/', data),
+  delete: (typeId: string) => api.delete(`/product-types/${typeId}`),
+};
+
+// Product Subtypes
+export const productSubtypesApi = {
+  getByType: (typeId: string) => api.get<ProductSubtype[]>(`/product-types/subtypes/type/${typeId}`),
+  getById: (subtypeId: string) => api.get<ProductSubtype>(`/product-types/subtypes/${subtypeId}`),
+  create: (data: { product_type_id: string; name: string; description?: string }) =>
+    api.post<ProductSubtype>('/product-types/subtypes', data),
+  delete: (subtypeId: string) => api.delete(`/product-types/subtypes/${subtypeId}`),
+};
+
+// Products
+export const productsApi = {
+  getAll: (orgId: string, subtypeId?: string, isActive?: boolean) => {
+    const params: any = {};
+    if (subtypeId) params.product_subtype_id = subtypeId;
+    if (isActive !== undefined) params.is_active = isActive;
+    return api.get<Product[]>(`/products/org/${orgId}`, { params });
+  },
+  getById: (productId: string) => api.get<Product>(`/products/${productId}`),
+  create: (data: {
+    org_id: string;
+    name: string;
+    description: string;
+    primary_color: string;
+    secondary_color: string;
+    product_subtype_id?: string;
+    is_active: boolean;
+    is_self_made: boolean;
+    difficulty: string;
+    quantity: number;
+    alert_quantity: number;
+    base_price?: string;
+    image_url?: string;
+    notes?: string;
+  }) => api.post<Product>('/products/', data),
+  update: (productId: string, data: Partial<Product>) => api.patch<Product>(`/products/${productId}`, data),
+  delete: (productId: string) => api.delete(`/products/${productId}`),
+};
+
+// Sales
+export const salesApi = {
+  getAll: (orgId: string) => api.get<Sale[]>(`/sales/org/${orgId}`),
+  getById: (saleId: string) => api.get<Sale>(`/sales/${saleId}`),
+  create: (orgId: string, data: { product_id: string; quantity: number; unit_price: string; notes?: string }) =>
+    api.post<Sale>(`/sales/?org_id=${orgId}`, data),
+};
+
