@@ -16,7 +16,11 @@ eggs/
 .eggs/
 lib/
 lib64/
-parts/
+# Python build parts (ignore only at root/build level, not frontend components)
+/parts/
+build/parts/
+dist/parts/
+!frontend/
 sdist/
 var/
 wheels/
