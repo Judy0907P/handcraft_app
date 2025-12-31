@@ -209,10 +209,20 @@ class ProductProfitSummary(BaseModel):
 # Organization Schemas
 class OrganizationBase(BaseModel):
     name: str
+    main_currency: str = "USD"
+    additional_currency: Optional[str] = None
+    exchange_rate: Decimal = Field(default=1.0, gt=0, description="Exchange rate: 1 main_currency = exchange_rate additional_currency")
 
 
 class OrganizationCreate(OrganizationBase):
     pass
+
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    main_currency: Optional[str] = None
+    additional_currency: Optional[str] = None
+    exchange_rate: Optional[Decimal] = Field(None, gt=0, description="Exchange rate: 1 main_currency = exchange_rate additional_currency")
 
 
 class OrganizationResponse(OrganizationBase):

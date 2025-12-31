@@ -9,6 +9,9 @@ export interface User {
 export interface Organization {
   org_id: string;
   name: string;
+  main_currency: string;
+  additional_currency?: string;
+  exchange_rate: string;
   created_at: string;
 }
 

@@ -376,6 +376,15 @@ const ProductCard = ({
           {product.base_price && (
             <p className="text-sm text-gray-600">Price: ${parseFloat(product.base_price).toFixed(2)}</p>
           )}
+          {product.status && product.status.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {product.status.map((status, idx) => (
+                <span key={idx} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                  {status}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex gap-1">
           <button

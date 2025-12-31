@@ -12,9 +12,9 @@ VALUES
 ON CONFLICT (email) DO NOTHING;
 
 -- 2. Create a test organization
-INSERT INTO organizations (org_id, name)
+INSERT INTO organizations (org_id, name, main_currency, additional_currency, exchange_rate)
 VALUES 
-  ('22222222-2222-2222-2222-222222222222', 'My Handcraft Store')
+  ('22222222-2222-2222-2222-222222222222', 'My Handcraft Store', 'USD', 'CNY', 7.2)
 ON CONFLICT DO NOTHING;
 
 -- 3. Create org membership

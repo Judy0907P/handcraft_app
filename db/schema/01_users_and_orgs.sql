@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS organizations (
   org_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  main_currency TEXT NOT NULL DEFAULT 'USD',
+  additional_currency TEXT,
+  exchange_rate NUMERIC(10, 4) DEFAULT 1.0 CHECK (exchange_rate > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

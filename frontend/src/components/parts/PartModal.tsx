@@ -20,7 +20,7 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     unit_cost: '',
     total_cost: '',
     cost_type: 'unit' as 'unit' | 'total',
-    cost_currency: 'USD' as 'USD' | 'RMB',
+    cost_currency: '',
     unit: '',
     type_id: '',
     subtype_id: '',
@@ -32,8 +32,8 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     notes: '',
   });
   
-  // Exchange rate: 1 USD = 7.2 RMB (you can make this configurable later)
-  const EXCHANGE_RATE = 7.2;
+  // Exchange rate from organization settings: 1 main_currency = exchange_rate additional_currency
+  const EXCHANGE_RATE = currentOrg?.exchange_rate ? parseFloat(currentOrg.exchange_rate) : 1.0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -80,7 +80,7 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         unit_cost: part.unit_cost,
         total_cost: '',
         cost_type: 'unit',
-        cost_currency: 'USD', // Parts are stored in USD
+        cost_currency: currentOrg?.main_currency || 'USD', // Parts are stored in main currency, default to main for display
         unit: part.unit || '',
         type_id: partType?.type_id || '',
         subtype_id: part.subtype_id || '',
@@ -107,7 +107,7 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         unit_cost: '',
         total_cost: '',
         cost_type: 'unit',
-        cost_currency: 'USD',
+        cost_currency: currentOrg?.main_currency || 'USD',
         unit: '',
         type_id: '',
         subtype_id: '',
@@ -322,21 +322,24 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
       return;
     }
 
-    // Calculate unit_cost from total_cost if needed and convert to USD
+    // Calculate unit_cost from total_cost if needed and convert to main currency
+    const mainCurrency = currentOrg?.main_currency || 'USD';
+    const additionalCurrency = currentOrg?.additional_currency;
     let unit_cost = formData.unit_cost;
+    
     if (formData.cost_type === 'total' && formData.total_cost && formData.stock > 0) {
-      let totalCostUSD = parseFloat(formData.total_cost);
-      // Convert to USD if currency is RMB
-      if (formData.cost_currency === 'RMB') {
-        totalCostUSD = totalCostUSD / EXCHANGE_RATE;
+      let totalCostMain = parseFloat(formData.total_cost);
+      // Convert to main currency if input is in additional currency
+      if (formData.cost_currency === additionalCurrency && additionalCurrency) {
+        totalCostMain = totalCostMain / EXCHANGE_RATE;
       }
-      unit_cost = (totalCostUSD / formData.stock).toFixed(2);
+      unit_cost = (totalCostMain / formData.stock).toFixed(2);
     } else if (formData.cost_type === 'total' && formData.total_cost) {
       setError('Stock must be greater than 0 to calculate unit cost from total cost');
       return;
     } else if (formData.cost_type === 'unit' && formData.unit_cost) {
-      // Convert unit cost to USD if currency is RMB
-      if (formData.cost_currency === 'RMB') {
+      // Convert unit cost to main currency if input is in additional currency
+      if (formData.cost_currency === additionalCurrency && additionalCurrency) {
         unit_cost = (parseFloat(formData.unit_cost) / EXCHANGE_RATE).toFixed(2);
       }
     }
@@ -467,33 +470,35 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
                 <span>Total Cost</span>
               </label>
             </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <div className="flex gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="cost_currency"
-                    value="USD"
-                    checked={formData.cost_currency === 'USD'}
-                    onChange={(e) => setFormData({ ...formData, cost_currency: 'USD' })}
-                    className="mr-2"
-                  />
-                  <span>USD</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="cost_currency"
-                    value="RMB"
-                    checked={formData.cost_currency === 'RMB'}
-                    onChange={(e) => setFormData({ ...formData, cost_currency: 'RMB' })}
-                    className="mr-2"
-                  />
-                  <span>RMB</span>
-                </label>
+            {currentOrg?.additional_currency && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="cost_currency"
+                      value={currentOrg.main_currency}
+                      checked={formData.cost_currency === currentOrg.main_currency}
+                      onChange={(e) => setFormData({ ...formData, cost_currency: currentOrg.main_currency })}
+                      className="mr-2"
+                    />
+                    <span>{currentOrg.main_currency}</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="cost_currency"
+                      value={currentOrg.additional_currency}
+                      checked={formData.cost_currency === currentOrg.additional_currency}
+                      onChange={(e) => setFormData({ ...formData, cost_currency: currentOrg.additional_currency })}
+                      className="mr-2"
+                    />
+                    <span>{currentOrg.additional_currency}</span>
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
             {formData.cost_type === 'unit' ? (
               <div>
                 <input
@@ -506,9 +511,9 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
                   placeholder={`Enter unit cost in ${formData.cost_currency}`}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
-                {formData.unit_cost && formData.cost_currency === 'RMB' && (
+                {formData.unit_cost && formData.cost_currency === currentOrg?.additional_currency && currentOrg?.additional_currency && (
                   <p className="mt-1 text-xs text-gray-500">
-                    ≈ ${(parseFloat(formData.unit_cost) / EXCHANGE_RATE).toFixed(2)} USD
+                    ≈ {(parseFloat(formData.unit_cost) / EXCHANGE_RATE).toFixed(2)} {currentOrg.main_currency}
                   </p>
                 )}
               </div>
@@ -524,17 +529,17 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
                   placeholder={`Enter total cost in ${formData.cost_currency}`}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
-                {formData.total_cost && formData.stock > 0 && (
+                {formData.total_cost && formData.stock > 0 && currentOrg && (
                   <div className="mt-1 text-xs text-gray-500 space-y-1">
                     <p>
-                      Total: {formData.cost_currency === 'RMB' 
-                        ? `¥${parseFloat(formData.total_cost).toFixed(2)} ≈ $${(parseFloat(formData.total_cost) / EXCHANGE_RATE).toFixed(2)} USD`
-                        : `$${parseFloat(formData.total_cost).toFixed(2)} USD`}
+                      Total: {formData.cost_currency === currentOrg.additional_currency && currentOrg.additional_currency
+                        ? `${parseFloat(formData.total_cost).toFixed(2)} ${currentOrg.additional_currency} ≈ ${(parseFloat(formData.total_cost) / EXCHANGE_RATE).toFixed(2)} ${currentOrg.main_currency}`
+                        : `${parseFloat(formData.total_cost).toFixed(2)} ${currentOrg.main_currency}`}
                     </p>
                     <p>
-                      Unit cost: {formData.cost_currency === 'RMB'
-                        ? `¥${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} ≈ $${((parseFloat(formData.total_cost) / EXCHANGE_RATE) / formData.stock).toFixed(2)} USD`
-                        : `$${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} USD`}
+                      Unit cost: {formData.cost_currency === currentOrg.additional_currency && currentOrg.additional_currency
+                        ? `${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} ${currentOrg.additional_currency} ≈ ${((parseFloat(formData.total_cost) / EXCHANGE_RATE) / formData.stock).toFixed(2)} ${currentOrg.main_currency}`
+                        : `${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} ${currentOrg.main_currency}`}
                     </p>
                   </div>
                 )}

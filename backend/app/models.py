@@ -25,7 +25,14 @@ class Organization(Base):
     
     org_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(Text, nullable=False)
+    main_currency = Column(Text, nullable=False, default="USD")
+    additional_currency = Column(Text, nullable=True)
+    exchange_rate = Column(Numeric(10, 4), nullable=False, default=1.0)
     created_at = Column(Text, nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("exchange_rate > 0", name="organizations_exchange_rate_check"),
+    )
     
     memberships = relationship("OrgMembership", back_populates="organization", cascade="all, delete-orphan")
     parts = relationship("Part", back_populates="organization", cascade="all, delete-orphan")

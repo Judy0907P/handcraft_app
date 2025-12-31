@@ -28,9 +28,13 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     quantity: 0,
     alert_quantity: 0,
     base_price: '',
+    price_currency: '',
     image_url: '',
     notes: '',
   });
+  
+  // Exchange rate from organization settings: 1 main_currency = exchange_rate additional_currency
+  const EXCHANGE_RATE = currentOrg?.exchange_rate ? parseFloat(currentOrg.exchange_rate) : 1.0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -84,6 +88,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         quantity: product.quantity,
         alert_quantity: product.alert_quantity,
         base_price: product.base_price || '',
+        price_currency: currentOrg?.main_currency || 'USD', // Products are stored in main currency, default to main for display
         image_url: product.image_url || '',
         notes: product.notes || '',
       });
@@ -109,12 +114,13 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         quantity: 0,
         alert_quantity: 0,
         base_price: '',
+        price_currency: currentOrg?.main_currency || 'USD',
         image_url: '',
         notes: '',
       });
       setImagePreview(null);
     }
-  }, [product, productTypes, productSubtypes]);
+  }, [product, productTypes, productSubtypes, currentOrg]);
 
   const getSubtypesForType = (typeId: string) => {
     return localProductSubtypes.filter((st) => st.product_type_id === typeId);
@@ -289,7 +295,16 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     setLoading(true);
 
     try {
-      const data = {
+      // Convert base_price to main currency if input is in additional currency
+      const mainCurrency = currentOrg?.main_currency || 'USD';
+      const additionalCurrency = currentOrg?.additional_currency;
+      let base_price = formData.base_price;
+      
+      if (base_price && formData.price_currency === additionalCurrency && additionalCurrency) {
+        base_price = (parseFloat(base_price) / EXCHANGE_RATE).toFixed(2);
+      }
+
+      const data: any = {
         name: formData.name,
         description: formData.description || undefined,
         primary_color: formData.primary_color || undefined,
@@ -301,7 +316,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         difficulty: formData.difficulty,
         quantity: formData.quantity,
         alert_quantity: formData.alert_quantity,
-        base_price: formData.base_price ? formData.base_price : undefined,
+        base_price: base_price ? base_price : undefined,
         image_url: formData.image_url || undefined,
         notes: formData.notes || undefined,
       };
@@ -441,14 +456,49 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Base Price</label>
+              {currentOrg?.additional_currency && (
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Currency</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="price_currency"
+                        value={currentOrg.main_currency}
+                        checked={formData.price_currency === currentOrg.main_currency}
+                        onChange={(e) => setFormData({ ...formData, price_currency: currentOrg.main_currency })}
+                        className="mr-2"
+                      />
+                      <span>{currentOrg.main_currency}</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="price_currency"
+                        value={currentOrg.additional_currency}
+                        checked={formData.price_currency === currentOrg.additional_currency}
+                        onChange={(e) => setFormData({ ...formData, price_currency: currentOrg.additional_currency })}
+                        className="mr-2"
+                      />
+                      <span>{currentOrg.additional_currency}</span>
+                    </label>
+                  </div>
+                </div>
+              )}
               <input
                 type="number"
                 step="0.01"
                 value={formData.base_price}
                 onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
                 min="0"
+                placeholder={`Enter base price in ${formData.price_currency || currentOrg?.main_currency || 'USD'}`}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              {formData.base_price && formData.price_currency === currentOrg?.additional_currency && currentOrg?.additional_currency && (
+                <p className="mt-1 text-xs text-gray-500">
+                  ≈ {(parseFloat(formData.base_price) / EXCHANGE_RATE).toFixed(2)} {currentOrg.main_currency}
+                </p>
+              )}
             </div>
           </div>
 

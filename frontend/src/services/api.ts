@@ -66,7 +66,8 @@ export const authApi = {
 export const organizationsApi = {
   getAll: () => api.get<Organization[]>('/organizations/'),
   getById: (orgId: string) => api.get<Organization>(`/organizations/${orgId}`),
-  create: (data: { name: string }) => api.post<Organization>('/organizations/', data),
+  create: (data: { name: string; main_currency?: string; additional_currency?: string; exchange_rate?: string }) => api.post<Organization>('/organizations/', data),
+  update: (orgId: string, data: { name?: string; main_currency?: string; additional_currency?: string; exchange_rate?: string }) => api.patch<Organization>(`/organizations/${orgId}`, data),
   delete: (orgId: string) => api.delete(`/organizations/${orgId}`),
 };
 

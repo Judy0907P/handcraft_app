@@ -18,7 +18,12 @@ def create_organization(
 ):
     """Create a new organization and add current user as owner"""
     try:
-        db_org = Organization(name=org.name)
+        db_org = Organization(
+            name=org.name,
+            main_currency=org.main_currency,
+            additional_currency=org.additional_currency,
+            exchange_rate=org.exchange_rate
+        )
         db.add(db_org)
         db.flush()  # Flush to get org_id
         
@@ -64,6 +69,29 @@ def get_organization(org_id: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found"
         )
+    return org
+
+
+@router.patch("/{org_id}", response_model=schemas.OrganizationResponse)
+def update_organization(
+    org_id: UUID,
+    org_update: schemas.OrganizationUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an organization"""
+    org = db.query(Organization).filter(Organization.org_id == org_id).first()
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+    
+    update_data = org_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(org, key, value)
+    
+    db.commit()
+    db.refresh(org)
     return org
 
 
