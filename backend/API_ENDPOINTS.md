@@ -168,7 +168,7 @@ Content-Type: application/json
   "primary_color": "Blue",
   "secondary_color": "White",
   "product_subtype_id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
-  "is_active": true,
+  "status": ["active"],
   "is_self_made": true,
   "difficulty": "easy",
   "quantity": 0,

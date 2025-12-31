@@ -61,6 +61,8 @@ def get_parts_by_subtype(
     return db.query(Part).filter(Part.subtype_id == subtype_id).offset(skip).limit(limit).all()
 
 
+
+
 @router.patch("/{part_id}", response_model=schemas.PartResponse)
 def update_part(part_id: UUID, part_update: schemas.PartUpdate, db: Session = Depends(get_db)):
     """Update a part"""

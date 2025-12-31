@@ -16,7 +16,11 @@ def create_part(db: Session, part: PartCreate) -> Part:
         unit=part.unit,
         subtype_id=part.subtype_id,
         specs=part.specs,
-        color=part.color
+        color=part.color,
+        alert_stock=part.alert_stock,
+        image_url=part.image_url,
+        status=part.status,
+        notes=part.notes
     )
     db.add(db_part)
     db.commit()
@@ -58,7 +62,7 @@ def create_product(db: Session, product: ProductCreate) -> Product:
         primary_color=product.primary_color,
         secondary_color=product.secondary_color,
         product_subtype_id=product.product_subtype_id,
-        is_active=product.is_active,
+        status=product.status,
         is_self_made=product.is_self_made,
         difficulty=product.difficulty,
         quantity=product.quantity,

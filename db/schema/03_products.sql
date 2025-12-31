@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS products (
   -- NULL = Uncategorized
   product_subtype_id UUID REFERENCES product_subtypes(product_subtype_id) ON DELETE SET NULL,
 
-  is_active BOOLEAN NOT NULL DEFAULT true,
+  status TEXT[] DEFAULT '{}',
   is_self_made BOOLEAN NOT NULL,
 
   difficulty TEXT NOT NULL DEFAULT 'NA'

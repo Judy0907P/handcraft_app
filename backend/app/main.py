@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import parts, products, production, sales, analytics, organizations, part_types, product_types, recipes, auth
+from app.routers import parts, products, production, sales, analytics, organizations, part_types, product_types, recipes, auth, part_status_labels
 
 app = FastAPI(
     title="Handcraft Management API",
@@ -28,6 +28,7 @@ app.include_router(recipes.router)
 app.include_router(production.router)
 app.include_router(sales.router)
 app.include_router(analytics.router)
+app.include_router(part_status_labels.router)
 
 
 @app.get("/")

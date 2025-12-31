@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
-import { partsApi, partTypesApi, partSubtypesApi } from '../../services/api';
+import { partsApi, partTypesApi, partSubtypesApi, partStatusLabelsApi, PartStatusLabel } from '../../services/api';
 import { Part, PartType, PartSubtype } from '../../types';
 import { X, Plus } from 'lucide-react';
 
@@ -26,6 +26,10 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     subtype_id: '',
     specs: '',
     color: '',
+    alert_stock: 0,
+    image_url: '',
+    status: [] as string[],
+    notes: '',
   });
   
   // Exchange rate: 1 USD = 7.2 RMB (you can make this configurable later)
@@ -40,11 +44,27 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
   const [creatingSubtype, setCreatingSubtype] = useState(false);
   const [localPartTypes, setLocalPartTypes] = useState<PartType[]>(partTypes);
   const [localPartSubtypes, setLocalPartSubtypes] = useState<PartSubtype[]>(partSubtypes);
+  const [availableStatusLabels, setAvailableStatusLabels] = useState<PartStatusLabel[]>([]);
+  const [newStatusLabel, setNewStatusLabel] = useState('');
 
   useEffect(() => {
     setLocalPartTypes(partTypes);
     setLocalPartSubtypes(partSubtypes);
   }, [partTypes, partSubtypes]);
+
+  useEffect(() => {
+    // Fetch existing status labels from the database
+    const loadStatusLabels = async () => {
+      if (!currentOrg) return;
+      try {
+        const response = await partStatusLabelsApi.getAll(currentOrg.org_id);
+        setAvailableStatusLabels(response.data);
+      } catch (error) {
+        console.error('Failed to load status labels:', error);
+      }
+    };
+    loadStatusLabels();
+  }, [currentOrg]);
 
   useEffect(() => {
     if (part) {
@@ -63,6 +83,10 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         subtype_id: part.subtype_id || '',
         specs: part.specs || '',
         color: part.color || '',
+        alert_stock: part.alert_stock || 0,
+        image_url: part.image_url || '',
+        status: part.status || [],
+        notes: part.notes || '',
       });
     } else {
       // Reset form when creating a new part
@@ -78,12 +102,69 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         subtype_id: '',
         specs: '',
         color: '',
+        alert_stock: 0,
+        image_url: '',
+        status: [],
+        notes: '',
       });
     }
   }, [part, partTypes, partSubtypes]);
 
   const getSubtypesForType = (typeId: string) => {
     return localPartSubtypes.filter((st) => st.type_id === typeId);
+  };
+
+  const handleStatusToggle = (label: string) => {
+    if (formData.status.includes(label)) {
+      setFormData({ ...formData, status: formData.status.filter(s => s !== label) });
+    } else {
+      setFormData({ ...formData, status: [...formData.status, label] });
+    }
+  };
+
+  const handleAddStatusLabel = async () => {
+    if (!currentOrg || !newStatusLabel.trim()) return;
+    
+    const labelText = newStatusLabel.trim();
+    // Check if label already exists
+    if (availableStatusLabels.some(l => l.label === labelText)) {
+      setNewStatusLabel('');
+      return;
+    }
+
+    try {
+      const response = await partStatusLabelsApi.create({
+        org_id: currentOrg.org_id,
+        label: labelText,
+      });
+      setAvailableStatusLabels([...availableStatusLabels, response.data]);
+      setFormData({ ...formData, status: [...formData.status, labelText] });
+      setNewStatusLabel('');
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        // Label already exists, just add it to form selection
+        setFormData({ ...formData, status: [...formData.status, labelText] });
+        setNewStatusLabel('');
+      } else {
+        console.error('Failed to create status label:', error);
+      }
+    }
+  };
+
+  const handleDeleteStatusLabel = async (labelId: string, labelText: string) => {
+    if (!confirm(`Are you sure you want to delete the status label "${labelText}"? This will remove it from all parts that have this label.`)) return;
+    
+    try {
+      await partStatusLabelsApi.delete(labelId);
+      setAvailableStatusLabels(availableStatusLabels.filter(l => l.label_id !== labelId));
+      // Remove from form selection if selected (the backend already removed it from all parts in the database)
+      if (formData.status.includes(labelText)) {
+        setFormData({ ...formData, status: formData.status.filter(s => s !== labelText) });
+      }
+    } catch (error) {
+      console.error('Failed to delete status label:', error);
+      alert('Failed to delete status label');
+    }
   };
 
   const handleCreateType = async () => {
@@ -179,6 +260,10 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         subtype_id: formData.subtype_id || undefined,
         specs: formData.specs || undefined,
         color: formData.color || undefined,
+        alert_stock: formData.alert_stock,
+        image_url: formData.image_url || undefined,
+        status: formData.status,
+        notes: formData.notes || undefined,
       };
 
       if (part) {
@@ -380,6 +465,102 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
               value={formData.color}
               onChange={(e) => setFormData({ ...formData, color: e.target.value })}
               placeholder="e.g., Red, Blue, Natural"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Alert Stock</label>
+            <input
+              type="number"
+              value={formData.alert_stock === 0 ? '' : formData.alert_stock}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setFormData({ ...formData, alert_stock: 0 });
+                  return;
+                }
+                const numValue = parseInt(value.replace(/^0+/, '') || '0', 10);
+                setFormData({ ...formData, alert_stock: isNaN(numValue) ? 0 : numValue });
+              }}
+              min="0"
+              placeholder="Alert when stock falls below this level"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+            <input
+              type="text"
+              value={formData.image_url}
+              onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+              placeholder="https://example.com/image.jpg"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newStatusLabel}
+                  onChange={(e) => setNewStatusLabel(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddStatusLabel();
+                    }
+                  }}
+                  placeholder="Add new status label"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddStatusLabel}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableStatusLabels.map((statusLabel) => (
+                  <div key={statusLabel.label_id} className="flex items-center gap-1">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.status.includes(statusLabel.label)}
+                        onChange={() => handleStatusToggle(statusLabel.label)}
+                        className="mr-2"
+                      />
+                      <span className="px-3 py-1 bg-gray-100 rounded-md text-sm">{statusLabel.label}</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteStatusLabel(statusLabel.label_id, statusLabel.label)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title={`Delete "${statusLabel.label}"`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {formData.status.length === 0 && availableStatusLabels.length === 0 && (
+                <p className="text-sm text-gray-500">No status labels available. Create one above.</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes..."
+              rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>

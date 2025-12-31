@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS parts (
 
   specs TEXT,
   color TEXT,
+  alert_stock INT NOT NULL DEFAULT 0 CHECK (alert_stock >= 0),
+  image_url TEXT,
+  status TEXT[] DEFAULT '{}',
+  notes TEXT,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 

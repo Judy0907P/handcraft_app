@@ -84,7 +84,6 @@ const SaleModal = ({ products, onClose, onSave }: SaleModalProps) => {
             >
               <option value="">Select a product</option>
               {products
-                .filter((p) => p.is_active)
                 .map((product) => (
                   <option key={product.product_id} value={product.product_id}>
                     {product.name} {product.base_price ? `($${parseFloat(product.base_price).toFixed(2)})` : ''}

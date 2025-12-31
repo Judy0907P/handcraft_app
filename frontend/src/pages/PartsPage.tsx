@@ -381,9 +381,24 @@ const PartCard = ({
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900">{part.name}</h4>
           <p className="text-sm text-gray-600">Stock: {part.stock} {part.unit || ''}</p>
+          {part.alert_stock > 0 && (
+            <p className="text-sm text-orange-600">Alert at: {part.alert_stock} {part.unit || ''}</p>
+          )}
           <p className="text-sm text-gray-600">Cost: ${parseFloat(part.unit_cost).toFixed(2)}</p>
           {part.specs && <p className="text-sm text-gray-500">Specs: {part.specs}</p>}
           {part.color && <p className="text-sm text-gray-500">Color: {part.color}</p>}
+          {part.status && part.status.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {part.status.map((status, idx) => (
+                <span key={idx} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                  {status}
+                </span>
+              ))}
+            </div>
+          )}
+          {part.notes && (
+            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{part.notes}</p>
+          )}
         </div>
         <div className="flex gap-1">
           <button
@@ -400,8 +415,19 @@ const PartCard = ({
           </button>
         </div>
       </div>
-      {/* Placeholder for image thumbnail */}
-      <div className="w-full h-32 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 text-sm">
+      {/* Image thumbnail */}
+      {part.image_url ? (
+        <img
+          src={part.image_url}
+          alt={part.name}
+          className="w-full h-32 object-cover rounded-md"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      ) : null}
+      <div className={`w-full h-32 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 text-sm ${part.image_url ? 'hidden' : ''}`}>
         No image
       </div>
     </div>

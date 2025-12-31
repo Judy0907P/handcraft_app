@@ -43,12 +43,11 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
 def get_products_by_org(
     org_id: UUID,
     product_subtype_id: Optional[UUID] = Query(None, description="Filter by product subtype ID"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """Get all products for an organization, optionally filtered by subtype or active status"""
+    """Get all products for an organization, optionally filtered by subtype"""
     from sqlalchemy.orm import joinedload
     from app.models import Product
     
@@ -59,16 +58,12 @@ def get_products_by_org(
     if product_subtype_id is not None:
         query = query.filter(Product.product_subtype_id == product_subtype_id)
     
-    if is_active is not None:
-        query = query.filter(Product.is_active == is_active)
-    
     return query.offset(skip).limit(limit).all()
 
 
 @router.get("/subtype/{product_subtype_id}", response_model=List[schemas.ProductResponse])
 def get_products_by_subtype(
     product_subtype_id: UUID,
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
@@ -80,9 +75,6 @@ def get_products_by_subtype(
     query = db.query(Product).options(joinedload(Product.recipe_lines)).filter(
         Product.product_subtype_id == product_subtype_id
     )
-    
-    if is_active is not None:
-        query = query.filter(Product.is_active == is_active)
     
     return query.offset(skip).limit(limit).all()
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
 import { productsApi } from '../../services/api';
 import { Product, ProductType, ProductSubtype } from '../../types';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 
 interface ProductModalProps {
   product: Product | null;
@@ -20,7 +20,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     primary_color: '',
     secondary_color: '',
     product_subtype_id: '',
-    is_active: true,
+    status: [] as string[],
     is_self_made: true,
     difficulty: 'NA',
     quantity: 0,
@@ -31,6 +31,8 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [availableStatusLabels, setAvailableStatusLabels] = useState<string[]>([]);
+  const [newStatusLabel, setNewStatusLabel] = useState('');
 
   useEffect(() => {
     if (product) {
@@ -40,7 +42,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         primary_color: product.primary_color,
         secondary_color: product.secondary_color,
         product_subtype_id: product.product_subtype_id || '',
-        is_active: product.is_active,
+        status: product.status || [],
         is_self_made: product.is_self_made,
         difficulty: product.difficulty,
         quantity: product.quantity,
@@ -51,6 +53,29 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
       });
     }
   }, [product]);
+
+  useEffect(() => {
+    if (product && product.status) {
+      setAvailableStatusLabels(product.status);
+    }
+  }, [product]);
+
+  const handleStatusToggle = (label: string) => {
+    if (formData.status.includes(label)) {
+      setFormData({ ...formData, status: formData.status.filter(s => s !== label) });
+    } else {
+      setFormData({ ...formData, status: [...formData.status, label] });
+    }
+  };
+
+  const handleAddStatusLabel = () => {
+    if (newStatusLabel.trim() && !availableStatusLabels.includes(newStatusLabel.trim())) {
+      const newLabel = newStatusLabel.trim();
+      setAvailableStatusLabels([...availableStatusLabels, newLabel]);
+      setFormData({ ...formData, status: [...formData.status, newLabel] });
+      setNewStatusLabel('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,17 +279,48 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
             />
           </div>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-            />
-            <label htmlFor="is_active" className="ml-2 text-sm font-medium text-gray-700">
-              Active
-            </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newStatusLabel}
+                  onChange={(e) => setNewStatusLabel(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddStatusLabel();
+                    }
+                  }}
+                  placeholder="Add new status label"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddStatusLabel}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableStatusLabels.map((label) => (
+                  <label key={label} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.status.includes(label)}
+                      onChange={() => handleStatusToggle(label)}
+                      className="mr-2"
+                    />
+                    <span className="px-3 py-1 bg-gray-100 rounded-md text-sm">{label}</span>
+                  </label>
+                ))}
+              </div>
+              {formData.status.length === 0 && availableStatusLabels.length === 0 && (
+                <p className="text-sm text-gray-500">No status labels selected</p>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

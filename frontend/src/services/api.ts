@@ -125,10 +125,9 @@ export const productSubtypesApi = {
 
 // Products
 export const productsApi = {
-  getAll: (orgId: string, subtypeId?: string, isActive?: boolean) => {
+  getAll: (orgId: string, subtypeId?: string) => {
     const params: any = {};
     if (subtypeId) params.product_subtype_id = subtypeId;
-    if (isActive !== undefined) params.is_active = isActive;
     return api.get<Product[]>(`/products/org/${orgId}`, { params });
   },
   getById: (productId: string) => api.get<Product>(`/products/${productId}`),
@@ -139,7 +138,7 @@ export const productsApi = {
     primary_color: string;
     secondary_color: string;
     product_subtype_id?: string;
-    is_active: boolean;
+    status: string[];
     is_self_made: boolean;
     difficulty: string;
     quantity: number;
@@ -150,6 +149,20 @@ export const productsApi = {
   }) => api.post<Product>('/products/', data),
   update: (productId: string, data: Partial<Product>) => api.patch<Product>(`/products/${productId}`, data),
   delete: (productId: string) => api.delete(`/products/${productId}`),
+};
+
+// Part Status Labels
+export interface PartStatusLabel {
+  label_id: string;
+  org_id: string;
+  label: string;
+  created_at: string;
+}
+
+export const partStatusLabelsApi = {
+  getAll: (orgId: string) => api.get<PartStatusLabel[]>(`/part-status-labels/org/${orgId}`),
+  create: (data: { org_id: string; label: string }) => api.post<PartStatusLabel>('/part-status-labels/', data),
+  delete: (labelId: string) => api.delete(`/part-status-labels/${labelId}`),
 };
 
 // Sales

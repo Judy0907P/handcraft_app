@@ -36,6 +36,10 @@ export interface Part {
   subtype_id?: string;
   specs?: string;
   color?: string;
+  alert_stock: number;
+  image_url?: string;
+  status: string[];
+  notes?: string;
   created_at: string;
 }
 
@@ -63,7 +67,7 @@ export interface Product {
   primary_color: string;
   secondary_color: string;
   product_subtype_id?: string;
-  is_active: boolean;
+  status: string[];
   is_self_made: boolean;
   difficulty: string;
   quantity: number;

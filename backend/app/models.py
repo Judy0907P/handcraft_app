@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, Numeric, Boolean, Text, ForeignKey, CheckConstraint, UniqueConstraint, DateTime
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
@@ -32,6 +32,8 @@ class Organization(Base):
     products = relationship("Product", back_populates="organization", cascade="all, delete-orphan")
     transactions = relationship("InventoryTransaction", back_populates="organization", cascade="all, delete-orphan")
     sales = relationship("Sale", back_populates="organization", cascade="all, delete-orphan")
+    part_status_labels = relationship("PartStatusLabel", back_populates="organization", cascade="all, delete-orphan")
+    product_status_labels = relationship("ProductStatusLabel", back_populates="organization", cascade="all, delete-orphan")
 
 
 class OrgMembership(Base):
@@ -93,11 +95,16 @@ class Part(Base):
     subtype_id = Column(UUID(as_uuid=True), ForeignKey("part_subtypes.subtype_id", ondelete="SET NULL"))
     specs = Column(Text)
     color = Column(Text)
+    alert_stock = Column(Integer, nullable=False, default=0)
+    image_url = Column(Text)
+    status = Column(ARRAY(Text), nullable=False, default=[])
+    notes = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (
         CheckConstraint("stock >= 0", name="parts_stock_check"),
         CheckConstraint("unit_cost >= 0", name="parts_unit_cost_check"),
+        CheckConstraint("alert_stock >= 0", name="parts_alert_stock_check"),
         UniqueConstraint("org_id", "name", name="uq_parts_org_name"),
     )
     
@@ -105,6 +112,36 @@ class Part(Base):
     subtype = relationship("PartSubtype", back_populates="parts")
     recipe_lines = relationship("RecipeLine", back_populates="part")
     transaction_lines = relationship("InventoryTransactionLine", back_populates="part")
+
+
+class PartStatusLabel(Base):
+    __tablename__ = "part_status_labels"
+    
+    label_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
+    label = Column(Text, nullable=False)
+    created_at = Column(Text, nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint("org_id", "label", name="uq_part_status_labels_org_label"),
+    )
+    
+    organization = relationship("Organization", back_populates="part_status_labels")
+
+
+class ProductStatusLabel(Base):
+    __tablename__ = "product_status_labels"
+    
+    label_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
+    label = Column(Text, nullable=False)
+    created_at = Column(Text, nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint("org_id", "label", name="uq_product_status_labels_org_label"),
+    )
+    
+    organization = relationship("Organization", back_populates="product_status_labels")
 
 
 class ProductType(Base):
@@ -150,7 +187,7 @@ class Product(Base):
     primary_color = Column(Text, nullable=False)
     secondary_color = Column(Text, nullable=False)
     product_subtype_id = Column(UUID(as_uuid=True), ForeignKey("product_subtypes.product_subtype_id", ondelete="SET NULL"))
-    is_active = Column(Boolean, nullable=False, default=True)
+    status = Column(ARRAY(Text), nullable=False, default=[])
     is_self_made = Column(Boolean, nullable=False)
     difficulty = Column(Text, nullable=False, default="NA")
     quantity = Column(Integer, nullable=False, default=0)

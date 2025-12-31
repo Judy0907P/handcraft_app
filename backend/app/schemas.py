@@ -44,6 +44,10 @@ class PartBase(BaseModel):
     subtype_id: Optional[UUID] = None
     specs: Optional[str] = None
     color: Optional[str] = None
+    alert_stock: int = Field(ge=0, default=0)
+    image_url: Optional[str] = None
+    status: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
 
 
 class PartCreate(PartBase):
@@ -58,6 +62,10 @@ class PartUpdate(BaseModel):
     subtype_id: Optional[UUID] = None
     specs: Optional[str] = None
     color: Optional[str] = None
+    alert_stock: Optional[int] = Field(None, ge=0)
+    image_url: Optional[str] = None
+    status: Optional[List[str]] = None
+    notes: Optional[str] = None
 
 
 class PartResponse(PartBase):
@@ -100,7 +108,7 @@ class ProductBase(BaseModel):
     primary_color: str
     secondary_color: str
     product_subtype_id: Optional[UUID] = None
-    is_active: bool = True
+    status: List[str] = Field(default_factory=list)
     is_self_made: bool
     difficulty: str = "NA"
     quantity: int = Field(ge=0, default=0)
@@ -121,7 +129,7 @@ class ProductUpdate(BaseModel):
     primary_color: Optional[str] = None
     secondary_color: Optional[str] = None
     product_subtype_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
+    status: Optional[List[str]] = None
     is_self_made: Optional[bool] = None
     difficulty: Optional[str] = None
     quantity: Optional[int] = Field(None, ge=0)
@@ -283,6 +291,42 @@ class ProductSubtypeCreate(ProductSubtypeBase):
 class ProductSubtypeResponse(ProductSubtypeBase):
     product_subtype_id: UUID
     product_type_id: UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Part Status Label Schemas
+class PartStatusLabelBase(BaseModel):
+    label: str
+
+
+class PartStatusLabelCreate(PartStatusLabelBase):
+    org_id: UUID
+
+
+class PartStatusLabelResponse(PartStatusLabelBase):
+    label_id: UUID
+    org_id: UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Product Status Label Schemas
+class ProductStatusLabelBase(BaseModel):
+    label: str
+
+
+class ProductStatusLabelCreate(ProductStatusLabelBase):
+    org_id: UUID
+
+
+class ProductStatusLabelResponse(ProductStatusLabelBase):
+    label_id: UUID
+    org_id: UUID
     created_at: datetime
     
     class Config:
