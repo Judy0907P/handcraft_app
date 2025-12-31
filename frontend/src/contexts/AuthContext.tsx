@@ -7,12 +7,14 @@ interface AuthContextType {
   register: (email: string, password: string, username: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<{ email: string; username: string; user_id?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const logout = () => {
     localStorage.removeItem('access_token');
@@ -37,11 +39,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           localStorage.setItem('user', JSON.stringify(userData));
           setUser(userData);
+          setIsLoading(false);
         })
         .catch(() => {
           // Token invalid, clear storage
           logout();
+          setIsLoading(false);
         });
+    } else {
+      setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -83,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
