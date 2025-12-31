@@ -103,6 +103,16 @@ export const partsApi = {
   }) => api.post<Part>('/parts/', data),
   update: (partId: string, data: Partial<Part>) => api.patch<Part>(`/parts/${partId}`, data),
   delete: (partId: string) => api.delete(`/parts/${partId}`),
+  uploadImage: (partId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<Part>(`/parts/${partId}/image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  deleteImage: (partId: string) => api.delete<Part>(`/parts/${partId}/image`),
 };
 
 // Product Types
