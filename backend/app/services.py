@@ -14,7 +14,9 @@ def create_part(db: Session, part: PartCreate) -> Part:
         stock=part.stock,
         unit_cost=part.unit_cost,
         unit=part.unit,
-        subtype_id=part.subtype_id
+        subtype_id=part.subtype_id,
+        specs=part.specs,
+        color=part.color
     )
     db.add(db_part)
     db.commit()

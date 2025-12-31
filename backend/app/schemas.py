@@ -42,6 +42,8 @@ class PartBase(BaseModel):
     unit_cost: Decimal = Field(ge=0)
     unit: Optional[str] = None
     subtype_id: Optional[UUID] = None
+    specs: Optional[str] = None
+    color: Optional[str] = None
 
 
 class PartCreate(PartBase):
@@ -54,6 +56,8 @@ class PartUpdate(BaseModel):
     unit_cost: Optional[Decimal] = Field(None, ge=0)
     unit: Optional[str] = None
     subtype_id: Optional[UUID] = None
+    specs: Optional[str] = None
+    color: Optional[str] = None
 
 
 class PartResponse(PartBase):

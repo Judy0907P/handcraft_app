@@ -34,6 +34,8 @@ export interface Part {
   unit_cost: string;
   unit?: string;
   subtype_id?: string;
+  specs?: string;
+  color?: string;
   created_at: string;
 }
 

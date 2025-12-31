@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS parts (
   -- NULL = Uncategorized
   subtype_id UUID REFERENCES part_subtypes(subtype_id) ON DELETE SET NULL,
 
+  specs TEXT,
+  color TEXT,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   CONSTRAINT uq_parts_org_name UNIQUE (org_id, name)

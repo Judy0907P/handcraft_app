@@ -91,6 +91,8 @@ class Part(Base):
     unit_cost = Column(Numeric(10, 2), nullable=False)
     unit = Column(Text)
     subtype_id = Column(UUID(as_uuid=True), ForeignKey("part_subtypes.subtype_id", ondelete="SET NULL"))
+    specs = Column(Text)
+    color = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (

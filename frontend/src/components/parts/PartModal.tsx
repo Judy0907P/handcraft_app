@@ -24,6 +24,8 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     unit: '',
     type_id: '',
     subtype_id: '',
+    specs: '',
+    color: '',
   });
   
   // Exchange rate: 1 USD = 7.2 RMB (you can make this configurable later)
@@ -59,6 +61,23 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         unit: part.unit || '',
         type_id: partType?.type_id || '',
         subtype_id: part.subtype_id || '',
+        specs: part.specs || '',
+        color: part.color || '',
+      });
+    } else {
+      // Reset form when creating a new part
+      setFormData({
+        name: '',
+        stock: 0,
+        unit_cost: '',
+        total_cost: '',
+        cost_type: 'unit',
+        cost_currency: 'USD',
+        unit: '',
+        type_id: '',
+        subtype_id: '',
+        specs: '',
+        color: '',
       });
     }
   }, [part, partTypes, partSubtypes]);
@@ -158,6 +177,8 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
         unit: formData.unit || undefined,
         org_id: currentOrg.org_id,
         subtype_id: formData.subtype_id || undefined,
+        specs: formData.specs || undefined,
+        color: formData.color || undefined,
       };
 
       if (part) {
@@ -337,6 +358,28 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
               value={formData.unit}
               onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
               placeholder="e.g., piece, kg, meter"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Specs</label>
+            <input
+              type="text"
+              value={formData.specs}
+              onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
+              placeholder="e.g., 2.5mm, 10cm x 10cm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+            <input
+              type="text"
+              value={formData.color}
+              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              placeholder="e.g., Red, Blue, Natural"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>

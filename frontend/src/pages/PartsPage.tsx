@@ -382,6 +382,8 @@ const PartCard = ({
           <h4 className="font-semibold text-gray-900">{part.name}</h4>
           <p className="text-sm text-gray-600">Stock: {part.stock} {part.unit || ''}</p>
           <p className="text-sm text-gray-600">Cost: ${parseFloat(part.unit_cost).toFixed(2)}</p>
+          {part.specs && <p className="text-sm text-gray-500">Specs: {part.specs}</p>}
+          {part.color && <p className="text-sm text-gray-500">Color: {part.color}</p>}
         </div>
         <div className="flex gap-1">
           <button
