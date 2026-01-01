@@ -170,7 +170,7 @@ export const productsApi = {
     });
   },
   deleteImage: (productId: string) => api.delete<Product>(`/products/${productId}/image`),
-  adjustInventory: (productId: string, data: { txn_type: 'adjustment' | 'purchase' | 'build_product'; qty: string; notes?: string }) => {
+  adjustInventory: (productId: string, data: { txn_type: 'loss' | 'build_product'; qty: string; notes?: string }) => {
     if (data.txn_type === 'build_product') {
       // Use production build endpoint
       return api.post<{ transaction_id: string; message: string; product_id: string; build_qty: string; new_product_quantity: number }>('/production/build', {

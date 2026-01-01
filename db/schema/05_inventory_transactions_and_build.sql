@@ -12,12 +12,12 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   txn_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
 
-  txn_type TEXT NOT NULL CHECK (txn_type IN ('build_product', 'adjustment', 'sale', 'purchase')),
+  txn_type TEXT NOT NULL CHECK (txn_type IN ('build_product', 'loss', 'sale')),
 
-  -- optional reference to product (NULL allowed e.g. adjustment on parts only)
+  -- optional reference to product (NULL allowed e.g. loss on parts only)
   product_id UUID REFERENCES products(product_id) ON DELETE SET NULL,
 
-  -- qty of product for build/sale/purchase; for adjustment you can still use it
+  -- qty of product for build/sale/loss
   qty NUMERIC(12,4) NOT NULL,
 
   notes TEXT,

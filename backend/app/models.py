@@ -247,7 +247,7 @@ class InventoryTransaction(Base):
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (
-        CheckConstraint("txn_type IN ('build_product', 'adjustment', 'sale', 'purchase')", name="inventory_transactions_txn_type_check"),
+        CheckConstraint("txn_type IN ('build_product', 'loss', 'sale')", name="inventory_transactions_txn_type_check"),
         CheckConstraint("qty > 0", name="inventory_transactions_qty_check"),
     )
     

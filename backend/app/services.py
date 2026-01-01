@@ -171,58 +171,51 @@ def get_profit_summary(db: Session, org_id: UUID):
 
 def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: Decimal, notes: Optional[str] = None) -> dict:
     """
-    Adjust product inventory for non-build transactions (adjustment, purchase).
+    Adjust product inventory for loss transactions (decreases inventory).
     For build_product, use build_product() function instead.
+    For sale, use record_sale() function instead.
     
     Transaction type rules:
-    - purchase: qty must be positive (adds to inventory)
-    - adjustment: qty can be positive or negative (user's choice)
+    - loss: qty must be positive (decreases inventory)
     
     This function:
     1. Validates the product exists
     2. Creates an inventory transaction record
-    3. Updates product quantity
+    3. Updates product quantity (decreases)
     4. Does NOT modify parts inventory (unlike build_product)
     """
     from app.models import Product, InventoryTransaction
     
     # Validate transaction type
-    valid_types = ['adjustment', 'purchase']
+    valid_types = ['loss']
     if txn_type not in valid_types:
         raise ValueError(f"Invalid txn_type. Must be one of: {', '.join(valid_types)}")
     
-    # Validate quantity based on transaction type
+    # Validate quantity
     from decimal import Decimal as Dec
     qty_decimal = Dec(str(qty))
     
-    if qty_decimal == 0:
-        raise ValueError("Quantity cannot be zero")
-    
-    # Validate sign based on transaction type
-    if txn_type == 'purchase' and qty_decimal <= 0:
-        raise ValueError("Purchase quantity must be greater than 0 (positive)")
-    # adjustment can be positive or negative, no validation needed
+    if qty_decimal <= 0:
+        raise ValueError("Loss quantity must be greater than 0 (positive)")
     
     # Get product
     product = db.query(Product).filter(Product.product_id == product_id).first()
     if not product:
         raise ValueError(f"Product {product_id} not found")
     
-    # Calculate new quantity (ensure non-negative)
-    # qty_decimal can be negative for sale/adjustment, positive for purchase/adjustment
-    qty_int = int(qty_decimal)  # Convert to int for quantity field
-    new_quantity = product.quantity + qty_int  # Addition handles both positive and negative
+    # Calculate new quantity (loss always decreases)
+    qty_int = int(qty_decimal)
+    new_quantity = product.quantity - qty_int  # Loss decreases inventory
     
     if new_quantity < 0:
-        raise ValueError(f"Insufficient inventory. Current: {product.quantity}, Change: {qty_int}")
+        raise ValueError(f"Insufficient inventory. Current: {product.quantity}, Loss: {qty_int}")
     
     # Create inventory transaction
-    # Store the actual qty value (can be negative for sale, positive for others)
     transaction = InventoryTransaction(
         org_id=product.org_id,
         txn_type=txn_type,
         product_id=product_id,
-        qty=qty_decimal,  # Store actual value (can be negative for sale)
+        qty=qty_decimal,  # Store positive value
         notes=notes
     )
     db.add(transaction)
@@ -230,7 +223,6 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
     
     # Update product quantity
     product.quantity = new_quantity
-    # updated_at is handled by database default/trigger, but we can set it explicitly if needed
     
     db.commit()
     db.refresh(transaction)
@@ -242,6 +234,6 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
         "txn_type": txn_type,
         "qty": qty,
         "new_product_quantity": product.quantity,
-        "message": f"Successfully {txn_type}: {qty} units. New quantity: {product.quantity}"
+        "message": f"Successfully recorded loss: {qty} units. New quantity: {product.quantity}"
     }
 

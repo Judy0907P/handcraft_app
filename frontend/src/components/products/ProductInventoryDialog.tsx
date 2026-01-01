@@ -15,7 +15,7 @@ export default function ProductInventoryDialog({
   onClose,
   onSuccess,
 }: ProductInventoryDialogProps) {
-  const [txnType, setTxnType] = useState<'build_product' | 'adjustment' | 'purchase'>('build_product');
+  const [txnType, setTxnType] = useState<'build_product' | 'loss'>('build_product');
   const [quantity, setQuantity] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -36,16 +36,16 @@ export default function ProductInventoryDialog({
     }
 
     // Validate quantity sign based on transaction type
-    if (txnType === 'purchase' && qtyValue <= 0) {
-      setError('Purchase quantity must be positive (greater than 0)');
+    if (qtyValue <= 0) {
+      setError('Quantity must be positive (greater than 0)');
       return;
     }
     
-    // For adjustment, ensure final quantity is non-negative
-    if (txnType === 'adjustment') {
-      const newQty = currentQuantity + qtyValue;
+    // For loss, ensure final quantity is non-negative
+    if (txnType === 'loss') {
+      const newQty = currentQuantity - qtyValue;
       if (newQty < 0) {
-        setError(`Adjustment would result in negative inventory. Maximum decrease: ${currentQuantity}`);
+        setError(`Loss would result in negative inventory. Maximum decrease: ${currentQuantity}`);
         return;
       }
     }
@@ -54,11 +54,9 @@ export default function ProductInventoryDialog({
     setError('');
 
     try {
-      // For adjustment, use parsed value (can be negative); for others use raw quantity
-      const qtyString = txnType === 'adjustment' ? qtyValue.toString() : quantity;
       await productsApi.adjustInventory(productId, {
         txn_type: txnType,
-        qty: qtyString,
+        qty: quantity,
         notes: notes || undefined,
       });
       onSuccess();
@@ -90,43 +88,24 @@ export default function ProductInventoryDialog({
     switch (txnType) {
       case 'build_product':
         return 'Quantity to Build';
-      case 'purchase':
-        return 'Quantity to Add (must be positive)';
-      case 'adjustment':
-        return 'Quantity Change (positive to increase, negative to decrease)';
+      case 'loss':
+        return 'Quantity to Lose (must be positive)';
       default:
         return 'Quantity';
     }
   };
 
   const getQuantityPlaceholder = () => {
-    switch (txnType) {
-      case 'build_product':
-      case 'purchase':
-        return 'e.g., 5';
-      case 'adjustment':
-        return 'e.g., +3 or -2';
-      default:
-        return '';
-    }
+    return 'e.g., 5';
   };
 
   const handleQuantityChange = (value: string) => {
-    if (txnType === 'adjustment') {
-      // Allow negative values for adjustment (e.g., +5, -3, 5, -3)
-      setQuantity(value);
-    } else {
-      // Only allow positive values for build_product and purchase
-      const numValue = value.replace(/[^0-9.]/g, '');
-      setQuantity(numValue);
-    }
+    // Only allow positive values
+    const numValue = value.replace(/[^0-9.]/g, '');
+    setQuantity(numValue);
   };
 
   const parseQuantity = (value: string): number => {
-    // Parse adjustment values (e.g., "+5", "-3", "5")
-    if (value.startsWith('+')) {
-      return parseFloat(value.substring(1)) || 0;
-    }
     return parseFloat(value) || 0;
   };
 
@@ -135,12 +114,12 @@ export default function ProductInventoryDialog({
     const change = parseQuantity(quantity);
     if (isNaN(change)) return null;
     
-    if (txnType === 'adjustment') {
-      // Adjustment can add or remove (change can be positive or negative)
-      return Math.max(0, currentQuantity + change);
+    if (txnType === 'loss') {
+      // Loss decreases inventory
+      return Math.max(0, currentQuantity - change);
     } else {
-      // build_product and purchase add inventory (always positive)
-      return currentQuantity + Math.abs(change);
+      // build_product adds inventory
+      return currentQuantity + change;
     }
   };
 
@@ -190,13 +169,11 @@ export default function ProductInventoryDialog({
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="build_product">Build Product (uses recipe parts)</option>
-              <option value="purchase">Purchase (add inventory, positive)</option>
-              <option value="adjustment">Adjustment (increase or decrease)</option>
+              <option value="loss">Loss (decreases inventory)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
               {txnType === 'build_product' && 'This will consume parts from the recipe and increase product quantity.'}
-              {txnType === 'purchase' && 'This will add inventory without affecting parts. Quantity must be positive.'}
-              {txnType === 'adjustment' && 'This allows manual adjustment of inventory (positive or negative).'}
+              {txnType === 'loss' && 'This will decrease product inventory. Quantity must be positive.'}
             </p>
           </div>
 

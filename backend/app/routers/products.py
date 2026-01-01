@@ -142,10 +142,10 @@ def adjust_product_inventory(
     adjustment: schemas.ProductInventoryAdjustmentRequest,
     db: Session = Depends(get_db)
 ):
-    """Adjust product inventory (adjustment or purchase). 
-    - purchase: qty must be positive (adds inventory)
-    - adjustment: qty can be positive or negative (user's choice)
-    For building products, use /production/build instead."""
+    """Adjust product inventory (loss). 
+    - loss: qty must be positive (decreases inventory)
+    For building products, use /production/build instead.
+    For sales, use /sales endpoint instead."""
     if adjustment.product_id != product_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

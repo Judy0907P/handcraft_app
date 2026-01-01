@@ -165,8 +165,8 @@ class BuildProductResponse(BaseModel):
 
 class ProductInventoryAdjustmentRequest(BaseModel):
     product_id: UUID
-    txn_type: str = Field(..., description="Transaction type: 'adjustment' or 'purchase'")
-    qty: Decimal = Field(..., description="Quantity change (must be positive for purchase, any value for adjustment)")
+    txn_type: str = Field(..., description="Transaction type: 'loss' (decreases inventory)")
+    qty: Decimal = Field(..., description="Quantity to decrease (must be positive)")
     notes: Optional[str] = None
 
 
