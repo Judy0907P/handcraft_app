@@ -50,8 +50,7 @@ def create_recipe_line(product_id: UUID, recipe_line: schemas.RecipeLineBase, db
         db_recipe_line = RecipeLine(
             product_id=product_id,
             part_id=recipe_line.part_id,
-            quantity=recipe_line.quantity,
-            unit=recipe_line.unit
+            quantity=recipe_line.quantity
         )
         db.add(db_recipe_line)
         db.commit()
@@ -166,7 +165,6 @@ def update_recipe_line(
     try:
         db_recipe_line.part_id = recipe_line.part_id
         db_recipe_line.quantity = recipe_line.quantity
-        db_recipe_line.unit = recipe_line.unit
         db.commit()
         db.refresh(db_recipe_line)
         return db_recipe_line
@@ -242,14 +240,12 @@ def create_recipe_lines_bulk(product_id: UUID, recipe_lines: List[schemas.Recipe
             if existing:
                 # Update existing instead of creating new
                 existing.quantity = recipe_line.quantity
-                existing.unit = recipe_line.unit
                 created_lines.append(existing)
             else:
                 db_recipe_line = RecipeLine(
                     product_id=product_id,
                     part_id=recipe_line.part_id,
-                    quantity=recipe_line.quantity,
-                    unit=recipe_line.unit
+                    quantity=recipe_line.quantity
                 )
                 db.add(db_recipe_line)
                 created_lines.append(db_recipe_line)

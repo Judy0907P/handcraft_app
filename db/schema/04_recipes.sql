@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS recipe_lines (
   part_id UUID NOT NULL REFERENCES parts(part_id) ON DELETE RESTRICT,
 
   quantity NUMERIC(12,4) NOT NULL CHECK (quantity > 0),
-  unit TEXT,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 

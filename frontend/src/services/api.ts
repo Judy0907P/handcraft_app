@@ -170,6 +170,23 @@ export const productsApi = {
     });
   },
   deleteImage: (productId: string) => api.delete<Product>(`/products/${productId}/image`),
+  adjustInventory: (productId: string, data: { txn_type: 'adjustment' | 'purchase' | 'build_product'; qty: string; notes?: string }) => {
+    if (data.txn_type === 'build_product') {
+      // Use production build endpoint
+      return api.post<{ transaction_id: string; message: string; product_id: string; build_qty: string; new_product_quantity: number }>('/production/build', {
+        product_id: productId,
+        build_qty: data.qty,
+      });
+    } else {
+      // Use inventory adjustment endpoint
+      return api.post<{ transaction_id: string; product_id: string; txn_type: string; qty: string; new_product_quantity: number; message: string }>(`/products/${productId}/inventory`, {
+        product_id: productId,
+        txn_type: data.txn_type,
+        qty: data.qty,
+        notes: data.notes,
+      });
+    }
+  },
 };
 
 // Product Status Labels
@@ -198,6 +215,27 @@ export const partStatusLabelsApi = {
   getAll: (orgId: string) => api.get<PartStatusLabel[]>(`/part-status-labels/org/${orgId}`),
   create: (data: { org_id: string; label: string }) => api.post<PartStatusLabel>('/part-status-labels/', data),
   delete: (labelId: string) => api.delete(`/part-status-labels/${labelId}`),
+};
+
+// Recipes
+export interface RecipeLine {
+  product_id: string;
+  part_id: string;
+  quantity: string;
+  created_at: string;
+}
+
+export const recipesApi = {
+  getByProduct: (productId: string) => api.get<RecipeLine[]>(`/recipes/product/${productId}`),
+  create: (productId: string, data: { part_id: string; quantity: string }) =>
+    api.post<RecipeLine>(`/recipes/product/${productId}`, data),
+  update: (productId: string, partId: string, data: { part_id: string; quantity: string }) =>
+    api.put<RecipeLine>(`/recipes/product/${productId}/part/${partId}`, data),
+  patch: (productId: string, partId: string, data: { quantity?: string }) =>
+    api.patch<RecipeLine>(`/recipes/product/${productId}/part/${partId}`, data),
+  delete: (productId: string, partId: string) => api.delete(`/recipes/product/${productId}/part/${partId}`),
+  bulkUpdate: (productId: string, recipeLines: Array<{ part_id: string; quantity: string }>) =>
+    api.post<RecipeLine[]>(`/recipes/product/${productId}/bulk`, recipeLines),
 };
 
 // Sales

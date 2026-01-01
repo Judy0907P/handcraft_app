@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   product_id UUID REFERENCES products(product_id) ON DELETE SET NULL,
 
   -- qty of product for build/sale/purchase; for adjustment you can still use it
-  qty NUMERIC(12,4) NOT NULL CHECK (qty > 0),
+  qty NUMERIC(12,4) NOT NULL,
 
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

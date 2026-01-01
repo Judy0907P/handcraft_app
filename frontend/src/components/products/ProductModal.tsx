@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
-import { productsApi, productTypesApi, productSubtypesApi, productStatusLabelsApi, ProductStatusLabel } from '../../services/api';
-import { Product, ProductType, ProductSubtype } from '../../types';
-import { X, Plus, Upload, Image as ImageIcon } from 'lucide-react';
+import { productsApi, productTypesApi, productSubtypesApi, productStatusLabelsApi, ProductStatusLabel, partsApi, recipesApi, RecipeLine, partTypesApi, partSubtypesApi } from '../../services/api';
+import { Product, ProductType, ProductSubtype, Part, PartType, PartSubtype } from '../../types';
+import { X, Plus, Upload, Image as ImageIcon, Trash2, Search, Edit } from 'lucide-react';
 import ProductTypeModal from './ProductTypeModal';
 import ProductSubtypeModal from './ProductSubtypeModal';
 
@@ -51,6 +51,18 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedType, setSelectedType] = useState<ProductType | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [recipeLines, setRecipeLines] = useState<Array<{ part_id: string; quantity: string }>>([]);
+  const [availableParts, setAvailableParts] = useState<Part[]>([]);
+  const [loadingParts, setLoadingParts] = useState(false);
+  const [partTypes, setPartTypes] = useState<PartType[]>([]);
+  const [partSubtypes, setPartSubtypes] = useState<PartSubtype[]>([]);
+  const [partSearchQuery, setPartSearchQuery] = useState<Record<number, string>>({});
+  const [selectedPartTypeId, setSelectedPartTypeId] = useState<Record<number, string>>({});
+  const [selectedPartSubtypeId, setSelectedPartSubtypeId] = useState<Record<number, string>>({});
+  const [partSelectorMode, setPartSelectorMode] = useState<Record<number, 'search' | 'browse'>>({});
+  const [editingRecipeLineIndex, setEditingRecipeLineIndex] = useState<number | null>(null);
+  const [savingRecipeLineIndex, setSavingRecipeLineIndex] = useState<number | null>(null);
+  const [originalRecipeLines, setOriginalRecipeLines] = useState<Array<{ part_id: string; quantity: string }>>([]);
 
   useEffect(() => {
     setLocalProductTypes(productTypes);
@@ -69,6 +81,33 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
       }
     };
     loadStatusLabels();
+
+    // Load parts, part types, and subtypes for recipe editing
+    const loadPartsData = async () => {
+      if (!currentOrg) return;
+      setLoadingParts(true);
+      try {
+        const [partsRes, typesRes] = await Promise.all([
+          partsApi.getAll(currentOrg.org_id),
+          partTypesApi.getAll(currentOrg.org_id),
+        ]);
+        setAvailableParts(partsRes.data);
+        setPartTypes(typesRes.data);
+
+        // Load subtypes for each type
+        const subtypesPromises = typesRes.data.map((type) =>
+          partSubtypesApi.getByType(type.type_id)
+        );
+        const subtypesResults = await Promise.all(subtypesPromises);
+        const allSubtypes = subtypesResults.flatMap((res) => res.data);
+        setPartSubtypes(allSubtypes);
+      } catch (error) {
+        console.error('Failed to load parts data:', error);
+      } finally {
+        setLoadingParts(false);
+      }
+    };
+    loadPartsData();
   }, [currentOrg]);
 
   useEffect(() => {
@@ -100,6 +139,8 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
       } else {
         setImagePreview(null);
       }
+
+      // Recipe lines will be loaded in separate useEffect
     } else {
       // Reset form when creating a new product
       setFormData({
@@ -119,8 +160,29 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         notes: '',
       });
       setImagePreview(null);
+      setRecipeLines([]);
     }
   }, [product, productTypes, productSubtypes, currentOrg]);
+
+  const loadRecipeLines = async (productId: string) => {
+    try {
+      const response = await recipesApi.getByProduct(productId);
+      setRecipeLines(response.data.map(line => ({
+        part_id: line.part_id,
+        quantity: line.quantity,
+      })));
+    } catch (error) {
+      console.error('Failed to load recipe lines:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (product?.product_id) {
+      loadRecipeLines(product.product_id);
+    } else {
+      setRecipeLines([]);
+    }
+  }, [product?.product_id]);
 
   const getSubtypesForType = (typeId: string) => {
     return localProductSubtypes.filter((st) => st.product_type_id === typeId);
@@ -287,6 +349,172 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     }
   };
 
+  const handleAddRecipeLine = () => {
+    const newIndex = recipeLines.length;
+    setRecipeLines([...recipeLines, { part_id: '', quantity: '1' }]);
+    setEditingRecipeLineIndex(newIndex);
+    setPartSelectorMode({ ...partSelectorMode, [newIndex]: 'search' });
+    setPartSearchQuery({ ...partSearchQuery, [newIndex]: '' });
+    setSelectedPartTypeId({ ...selectedPartTypeId, [newIndex]: '' });
+    setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [newIndex]: '' });
+  };
+
+  const handleUpdateRecipeLine = (index: number, field: 'part_id' | 'quantity', value: string) => {
+    const updated = [...recipeLines];
+    updated[index] = { ...updated[index], [field]: value };
+    setRecipeLines(updated);
+  };
+
+  const handleDeleteRecipeLine = async (index: number) => {
+    const line = recipeLines[index];
+    
+    // If this is an existing recipe line (has part_id and product exists), delete from backend
+    if (product && line.part_id) {
+      if (!confirm('Are you sure you want to delete this recipe line?')) return;
+      try {
+        setSavingRecipeLineIndex(index);
+        await recipesApi.delete(product.product_id, line.part_id);
+      } catch (error: any) {
+        alert(error.response?.data?.detail || 'Failed to delete recipe line');
+        setSavingRecipeLineIndex(null);
+        return;
+      } finally {
+        setSavingRecipeLineIndex(null);
+      }
+    }
+    
+    // Remove from local state
+    setRecipeLines(recipeLines.filter((_, i) => i !== index));
+    setEditingRecipeLineIndex(null);
+    
+    // Clean up filter state for this index
+    const newSearchQuery = { ...partSearchQuery };
+    const newTypeId = { ...selectedPartTypeId };
+    const newSubtypeId = { ...selectedPartSubtypeId };
+    const newMode = { ...partSelectorMode };
+    delete newSearchQuery[index];
+    delete newTypeId[index];
+    delete newSubtypeId[index];
+    delete newMode[index];
+    setPartSearchQuery(newSearchQuery);
+    setSelectedPartTypeId(newTypeId);
+    setSelectedPartSubtypeId(newSubtypeId);
+    setPartSelectorMode(newMode);
+  };
+
+  const handleSaveRecipeLine = async (index: number) => {
+    const line = recipeLines[index];
+    
+    if (!line.part_id || !line.quantity || parseFloat(line.quantity) <= 0) {
+      alert('Please select a part and enter a valid quantity');
+      return;
+    }
+
+    if (!product) {
+      // For new products, just mark as saved (will be saved when product is created)
+      setEditingRecipeLineIndex(null);
+      return;
+    }
+
+    try {
+      setSavingRecipeLineIndex(index);
+      
+      // Check if this recipe line already exists
+      const existingLines = await recipesApi.getByProduct(product.product_id);
+      const existing = existingLines.data.find(
+        (rl: RecipeLine) => rl.part_id === line.part_id
+      );
+
+      if (existing) {
+        // Update existing
+        await recipesApi.patch(product.product_id, line.part_id, {
+          quantity: line.quantity,
+        });
+      } else {
+        // Create new
+        await recipesApi.create(product.product_id, {
+          part_id: line.part_id,
+          quantity: line.quantity,
+        });
+      }
+
+      setEditingRecipeLineIndex(null);
+      setOriginalRecipeLines([]);
+      // Reset filters for this line
+      setPartSearchQuery({ ...partSearchQuery, [index]: '' });
+      setSelectedPartTypeId({ ...selectedPartTypeId, [index]: '' });
+      setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: '' });
+      
+      // Reload recipe lines to get updated data
+      if (product?.product_id) {
+        await loadRecipeLines(product.product_id);
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to save recipe line');
+    } finally {
+      setSavingRecipeLineIndex(null);
+    }
+  };
+
+  const handleEditRecipeLine = (index: number) => {
+    // Store original values for cancel
+    setOriginalRecipeLines([...recipeLines]);
+    setEditingRecipeLineIndex(index);
+    if (!partSelectorMode[index]) {
+      setPartSelectorMode({ ...partSelectorMode, [index]: 'search' });
+    }
+  };
+
+  const getFilteredParts = (index: number) => {
+    let filtered = availableParts;
+    const mode = partSelectorMode[index] || 'search';
+    const searchQuery = partSearchQuery[index] || '';
+    const typeId = selectedPartTypeId[index] || '';
+    const subtypeId = selectedPartSubtypeId[index] || '';
+
+    if (mode === 'search') {
+      // Filter by search query
+      if (searchQuery) {
+        filtered = filtered.filter((part) =>
+          part.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+    } else {
+      // Filter by type and subtype
+      if (subtypeId) {
+        filtered = filtered.filter((part) => part.subtype_id === subtypeId);
+      } else if (typeId) {
+        const subtypeIds = partSubtypes
+          .filter((st) => st.type_id === typeId)
+          .map((st) => st.subtype_id);
+        filtered = filtered.filter((part) => 
+          part.subtype_id && subtypeIds.includes(part.subtype_id)
+        );
+      }
+    }
+
+    return filtered;
+  };
+
+  const getSubtypesForPartType = (typeId: string) => {
+    return partSubtypes.filter((st) => st.type_id === typeId);
+  };
+
+  const calculateRecipeTotalCost = () => {
+    let total = 0;
+    recipeLines.forEach((line) => {
+      if (line.part_id && line.quantity) {
+        const part = availableParts.find((p) => p.part_id === line.part_id);
+        if (part && part.unit_cost) {
+          const quantity = parseFloat(line.quantity) || 0;
+          const unitCost = parseFloat(part.unit_cost) || 0;
+          total += quantity * unitCost;
+        }
+      }
+    });
+    return total;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrg) return;
@@ -314,7 +542,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         status: formData.status,
         is_self_made: formData.is_self_made,
         difficulty: formData.difficulty,
-        quantity: formData.quantity,
+        quantity: 0, // Quantity always starts at 0 for new products, can only be changed via inventory transactions
         alert_quantity: formData.alert_quantity,
         base_price: base_price ? base_price : undefined,
         image_url: formData.image_url || undefined,
@@ -326,6 +554,29 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         savedProduct = await productsApi.update(product.product_id, data);
       } else {
         savedProduct = await productsApi.create(data);
+      }
+
+      const productId = savedProduct.data.product_id;
+
+      // Save recipe lines (only for new products - existing products should have lines saved individually)
+      if (productId && !product) {
+        try {
+          // Filter out empty recipe lines and validate
+          const validRecipeLines = recipeLines
+            .filter(line => line.part_id && parseFloat(line.quantity) > 0)
+            .map(line => ({
+              part_id: line.part_id,
+              quantity: line.quantity,
+            }));
+          if (validRecipeLines.length > 0) {
+            await recipesApi.bulkUpdate(productId, validRecipeLines);
+          }
+        } catch (error: any) {
+          console.error('Failed to save recipe lines:', error);
+          setError(error.response?.data?.detail || 'Failed to save recipe lines');
+          setLoading(false);
+          return;
+        }
       }
 
       // If there's a new image file selected and product was just created/updated, upload it
@@ -413,28 +664,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-              <input
-                type="number"
-                value={formData.quantity === 0 ? '' : formData.quantity}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Handle empty input
-                  if (value === '') {
-                    setFormData({ ...formData, quantity: 0 });
-                    return;
-                  }
-                  // Remove leading zeros and parse
-                  const numValue = parseInt(value.replace(/^0+/, '') || '0', 10);
-                  setFormData({ ...formData, quantity: isNaN(numValue) ? 0 : numValue });
-                }}
-                min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Alert Quantity</label>
               <input
@@ -728,6 +958,261 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
               </div>
               {formData.status.length === 0 && availableStatusLabels.length === 0 && (
                 <p className="text-sm text-gray-500">No status labels available. Create one above.</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Recipe</label>
+            <div className="space-y-2">
+              {recipeLines.map((line, index) => {
+                const part = availableParts.find(p => p.part_id === line.part_id);
+                const isEditing = editingRecipeLineIndex === index;
+                const isSaving = savingRecipeLineIndex === index;
+                const filteredParts = getFilteredParts(index);
+                const hasPart = !!line.part_id && !!part;
+                
+                return (
+                  <div key={index} className="p-3 border border-gray-200 rounded-md">
+                    {!isEditing && hasPart ? (
+                      // Compact view when part is selected
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{part.name}</div>
+                          <div className="text-sm text-gray-600">
+                            Quantity: {line.quantity} {part.unit ? `(${part.unit})` : ''}
+                          </div>
+                          {part.unit_cost && (
+                            <div className="text-sm text-gray-500">
+                              Cost: ${(parseFloat(part.unit_cost) * parseFloat(line.quantity || '0')).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditRecipeLine(index)}
+                            disabled={isSaving}
+                            className="px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-50 rounded-md transition-colors disabled:opacity-50"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipeLine(index)}
+                            disabled={isSaving}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                            title="Remove recipe line"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Full editing interface
+                      <div className="space-y-2">
+                        <div className="flex gap-2 items-start">
+                          <div className="flex-1 space-y-2">
+                            {/* Part Selector Mode Toggle */}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPartSelectorMode({ ...partSelectorMode, [index]: 'search' });
+                                  setPartSearchQuery({ ...partSearchQuery, [index]: '' });
+                                  setSelectedPartTypeId({ ...selectedPartTypeId, [index]: '' });
+                                  setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: '' });
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                  (partSelectorMode[index] || 'search') === 'search'
+                                    ? 'bg-primary-50 border-primary-500 text-primary-700'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                <Search className="w-4 h-4 inline mr-1" />
+                                Search
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPartSelectorMode({ ...partSelectorMode, [index]: 'browse' });
+                                  setPartSearchQuery({ ...partSearchQuery, [index]: '' });
+                                  setSelectedPartTypeId({ ...selectedPartTypeId, [index]: '' });
+                                  setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: '' });
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                  (partSelectorMode[index] || 'search') === 'browse'
+                                    ? 'bg-primary-50 border-primary-500 text-primary-700'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                Browse
+                              </button>
+                            </div>
+
+                            {/* Search Mode */}
+                            {(partSelectorMode[index] || 'search') === 'search' && (
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <input
+                                  type="text"
+                                  value={partSearchQuery[index] || ''}
+                                  onChange={(e) => setPartSearchQuery({ ...partSearchQuery, [index]: e.target.value })}
+                                  placeholder="Search parts by name..."
+                                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                />
+                              </div>
+                            )}
+
+                            {/* Browse Mode */}
+                            {(partSelectorMode[index] || 'search') === 'browse' && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <select
+                                  value={selectedPartTypeId[index] || ''}
+                                  onChange={(e) => {
+                                    setSelectedPartTypeId({ ...selectedPartTypeId, [index]: e.target.value });
+                                    setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: '' });
+                                  }}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                >
+                                  <option value="">All Types</option>
+                                  {partTypes.map((type) => (
+                                    <option key={type.type_id} value={type.type_id}>
+                                      {type.type_name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={selectedPartSubtypeId[index] || ''}
+                                  onChange={(e => setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: e.target.value }))}
+                                  disabled={!selectedPartTypeId[index]}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  <option value="">All Subtypes</option>
+                                  {selectedPartTypeId[index] && getSubtypesForPartType(selectedPartTypeId[index]).map((subtype) => (
+                                    <option key={subtype.subtype_id} value={subtype.subtype_id}>
+                                      {subtype.subtype_name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Part Selection Dropdown */}
+                            <select
+                              value={line.part_id}
+                              onChange={(e) => {
+                                handleUpdateRecipeLine(index, 'part_id', e.target.value);
+                                // For new products, exit editing mode once part is selected
+                                if (!product && e.target.value) {
+                                  setEditingRecipeLineIndex(null);
+                                }
+                                // Reset filters after selection
+                                setPartSearchQuery({ ...partSearchQuery, [index]: '' });
+                                setSelectedPartTypeId({ ...selectedPartTypeId, [index]: '' });
+                                setSelectedPartSubtypeId({ ...selectedPartSubtypeId, [index]: '' });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            >
+                              <option value="">Select part</option>
+                              {filteredParts.map((p) => (
+                                <option key={p.part_id} value={p.part_id}>
+                                  {p.name} {p.unit ? `(${p.unit})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipeLine(index)}
+                            disabled={isSaving}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                            title="Remove recipe line"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Quantity and Unit Display */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              min="0.0001"
+                              value={line.quantity}
+                              onChange={(e) => handleUpdateRecipeLine(index, 'quantity', e.target.value)}
+                              placeholder="Quantity"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+                            <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
+                              {part?.unit || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Save/Cancel Buttons */}
+                        {product && (
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Restore original values
+                                if (originalRecipeLines.length > 0) {
+                                  setRecipeLines([...originalRecipeLines]);
+                                } else {
+                                  // Reload from server
+                                  loadRecipeLines(product.product_id);
+                                }
+                                setEditingRecipeLineIndex(null);
+                                setOriginalRecipeLines([]);
+                              }}
+                              disabled={isSaving}
+                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveRecipeLine(index)}
+                              disabled={isSaving || !line.part_id || !line.quantity}
+                              className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSaving ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={handleAddRecipeLine}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-primary-500 hover:bg-primary-50 transition-colors text-gray-600 hover:text-primary-600"
+              >
+                <Plus className="w-4 h-4" />
+                Add Recipe Line
+              </button>
+              {recipeLines.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-2">No recipe lines. Click "Add Recipe Line" to add parts required to make this product.</p>
+              )}
+              
+              {/* Total Cost Display */}
+              {recipeLines.length > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Total Recipe Cost:</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                      ${calculateRecipeTotalCost().toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           </div>

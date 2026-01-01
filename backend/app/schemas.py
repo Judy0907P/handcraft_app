@@ -81,7 +81,6 @@ class PartResponse(PartBase):
 class RecipeLineBase(BaseModel):
     part_id: UUID
     quantity: Decimal = Field(gt=0)
-    unit: Optional[str] = None
 
 
 class RecipeLineCreate(RecipeLineBase):
@@ -98,7 +97,6 @@ class RecipeLineResponse(RecipeLineBase):
 
 class RecipeLineUpdate(BaseModel):
     quantity: Optional[Decimal] = Field(None, gt=0)
-    unit: Optional[str] = None
 
 
 # Product Schemas
@@ -163,6 +161,22 @@ class BuildProductResponse(BaseModel):
     product_id: UUID
     build_qty: Decimal
     new_product_quantity: int
+
+
+class ProductInventoryAdjustmentRequest(BaseModel):
+    product_id: UUID
+    txn_type: str = Field(..., description="Transaction type: 'adjustment' or 'purchase'")
+    qty: Decimal = Field(..., description="Quantity change (must be positive for purchase, any value for adjustment)")
+    notes: Optional[str] = None
+
+
+class ProductInventoryAdjustmentResponse(BaseModel):
+    transaction_id: UUID
+    product_id: UUID
+    txn_type: str
+    qty: Decimal
+    new_product_quantity: int
+    message: str
 
 
 # Sale Schemas

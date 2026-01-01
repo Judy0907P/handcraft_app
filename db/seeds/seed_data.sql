@@ -68,17 +68,17 @@ ON CONFLICT (org_id, name) DO NOTHING;
 
 -- 8. Create recipe lines (BOM)
 -- Blue Bead Bracelet: 10 blue beads + 0.5m cotton string
-INSERT INTO recipe_lines (product_id, part_id, quantity, unit)
+INSERT INTO recipe_lines (product_id, part_id, quantity)
 VALUES 
-  ('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 10, 'piece'),
-  ('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 0.5, 'meter')
+  ('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 10),
+  ('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 0.5)
 ON CONFLICT (product_id, part_id) DO NOTHING;
 
 -- Red Bead Necklace: 20 red beads + 1m leather cord
-INSERT INTO recipe_lines (product_id, part_id, quantity, unit)
+INSERT INTO recipe_lines (product_id, part_id, quantity)
 VALUES 
-  ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 20, 'piece'),
-  ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 1, 'meter')
+  ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 20),
+  ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 1)
 ON CONFLICT (product_id, part_id) DO NOTHING;
 
 COMMIT;

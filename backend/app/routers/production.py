@@ -19,12 +19,23 @@ def build_product(request: schemas.BuildProductRequest, db: Session = Depends(ge
         if "not found" in error_msg.lower():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=error_msg
+                detail="Product not found"
             )
-        elif "insufficient" in error_msg.lower():
+        elif "insufficient" in error_msg.lower() or "insufficient parts inventory" in error_msg.lower():
+            # Parse the build quantity from the error message
+            build_qty = str(request.build_qty)
+            # Get product name for better error message
+            from app.models import Product
+            product = db.query(Product).filter(Product.product_id == request.product_id).first()
+            product_name = product.name if product else "the product"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_msg
+                detail=f"Cannot build {build_qty} unit(s) of {product_name}: Insufficient parts. The recipe requires more parts than currently available in stock. Please check your parts inventory and add more parts before building."
+            )
+        elif "no recipe found" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot build product: No recipe found. Please add parts to the recipe first."
             )
         else:
             raise HTTPException(

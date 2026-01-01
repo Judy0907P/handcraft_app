@@ -127,14 +127,50 @@ def update_product(product_id: UUID, product_update: schemas.ProductUpdate, db: 
             db_recipe_line = RecipeLine(
                 product_id=product_id,
                 part_id=recipe_line['part_id'],
-                quantity=recipe_line['quantity'],
-                unit=recipe_line.get('unit')
+                quantity=recipe_line['quantity']
             )
             db.add(db_recipe_line)
     
     db.commit()
     db.refresh(product)
     return product
+
+
+@router.post("/{product_id}/inventory", response_model=schemas.ProductInventoryAdjustmentResponse)
+def adjust_product_inventory(
+    product_id: UUID,
+    adjustment: schemas.ProductInventoryAdjustmentRequest,
+    db: Session = Depends(get_db)
+):
+    """Adjust product inventory (adjustment or purchase). 
+    - purchase: qty must be positive (adds inventory)
+    - adjustment: qty can be positive or negative (user's choice)
+    For building products, use /production/build instead."""
+    if adjustment.product_id != product_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product ID in URL must match product_id in request body"
+        )
+    
+    try:
+        result = services.adjust_product_inventory(
+            db,
+            product_id=product_id,
+            txn_type=adjustment.txn_type,
+            qty=adjustment.qty,
+            notes=adjustment.notes
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to adjust inventory: {str(e)}"
+        )
 
 
 @router.post("/{product_id}/image", response_model=schemas.ProductResponse)

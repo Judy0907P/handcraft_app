@@ -225,7 +225,6 @@ class RecipeLine(Base):
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.product_id", ondelete="CASCADE"), primary_key=True)
     part_id = Column(UUID(as_uuid=True), ForeignKey("parts.part_id", ondelete="RESTRICT"), primary_key=True)
     quantity = Column(Numeric(12, 4), nullable=False)
-    unit = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (

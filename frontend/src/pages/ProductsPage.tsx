@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
 import { productsApi, productTypesApi, productSubtypesApi } from '../services/api';
 import { Product, ProductType, ProductSubtype, SortOption, SortDirection } from '../types';
-import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import ProductModal from '../components/products/ProductModal';
 import ProductTypeModal from '../components/products/ProductTypeModal';
 import ProductSubtypeModal from '../components/products/ProductSubtypeModal';
+import ProductInventoryDialog from '../components/products/ProductInventoryDialog';
 
 const ProductsPage = () => {
   const { currentOrg } = useOrg();
@@ -22,6 +23,8 @@ const ProductsPage = () => {
   const [selectedType, setSelectedType] = useState<ProductType | null>(null);
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [showInventoryDialog, setShowInventoryDialog] = useState(false);
+  const [selectedProductForInventory, setSelectedProductForInventory] = useState<Product | null>(null);
 
   useEffect(() => {
     if (currentOrg) {
@@ -107,6 +110,15 @@ const ProductsPage = () => {
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Failed to delete product');
     }
+  };
+
+  const handleInventoryChange = (product: Product) => {
+    setSelectedProductForInventory(product);
+    setShowInventoryDialog(true);
+  };
+
+  const handleInventoryChangeSuccess = async () => {
+    await loadData(); // Reload products to get updated quantities
   };
 
   const handleDeleteType = async (typeId: string) => {
@@ -287,6 +299,7 @@ const ProductsPage = () => {
                                   setShowProductModal(true);
                                 }}
                                 onDelete={() => handleDeleteProduct(product.product_id)}
+                                onInventoryChange={() => handleInventoryChange(product)}
                               />
                             ))}
                           </div>
@@ -313,6 +326,7 @@ const ProductsPage = () => {
                     setShowProductModal(true);
                   }}
                   onDelete={() => handleDeleteProduct(product.product_id)}
+                  onInventoryChange={() => handleInventoryChange(product)}
                 />
               ))}
             </div>
@@ -354,6 +368,18 @@ const ProductsPage = () => {
           onSave={loadData}
         />
       )}
+
+      {showInventoryDialog && selectedProductForInventory && (
+        <ProductInventoryDialog
+          productId={selectedProductForInventory.product_id}
+          currentQuantity={selectedProductForInventory.quantity}
+          onClose={() => {
+            setShowInventoryDialog(false);
+            setSelectedProductForInventory(null);
+          }}
+          onSuccess={handleInventoryChangeSuccess}
+        />
+      )}
     </div>
   );
 };
@@ -362,10 +388,12 @@ const ProductCard = ({
   product,
   onEdit,
   onDelete,
+  onInventoryChange,
 }: {
   product: Product;
   onEdit: () => void;
   onDelete: () => void;
+  onInventoryChange: () => void;
 }) => {
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -388,14 +416,23 @@ const ProductCard = ({
         </div>
         <div className="flex gap-1">
           <button
+            onClick={onInventoryChange}
+            className="p-1 text-gray-600 hover:text-green-600 transition-colors"
+            title="Adjust inventory"
+          >
+            <Package className="w-4 h-4" />
+          </button>
+          <button
             onClick={onEdit}
             className="p-1 text-gray-600 hover:text-primary-600 transition-colors"
+            title="Edit product"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
             className="p-1 text-gray-600 hover:text-red-600 transition-colors"
+            title="Delete product"
           >
             <Trash2 className="w-4 h-4" />
           </button>

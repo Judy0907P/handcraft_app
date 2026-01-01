@@ -62,6 +62,13 @@ export interface ProductSubtype {
   created_at: string;
 }
 
+export interface RecipeLine {
+  product_id: string;
+  part_id: string;
+  quantity: string;
+  created_at: string;
+}
+
 export interface Product {
   product_id: string;
   org_id: string;
@@ -80,6 +87,7 @@ export interface Product {
   notes?: string;
   created_at: string;
   updated_at: string;
+  recipe_lines?: RecipeLine[];
 }
 
 export interface Sale {
