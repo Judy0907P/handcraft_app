@@ -1,11 +1,13 @@
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrg } from '../../contexts/OrgContext';
-import { Home, Package, ShoppingBag, DollarSign, Settings, LogOut, Building2 } from 'lucide-react';
+import { useCart } from '../../contexts/CartContext';
+import { Home, Package, ShoppingBag, ShoppingCart, DollarSign, Settings, LogOut, Building2 } from 'lucide-react';
 
 const MainLayout = () => {
   const { logout } = useAuth();
   const { currentOrg, setCurrentOrg } = useOrg();
+  const { getItemCount } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,10 +22,12 @@ const MainLayout = () => {
     navigate('/orgs');
   };
 
+  const cartItemCount = getItemCount();
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/parts', icon: Package, label: 'Parts' },
     { path: '/products', icon: ShoppingBag, label: 'Products' },
+    { path: '/cart', icon: ShoppingCart, label: 'Cart' },
     { path: '/sales', icon: DollarSign, label: 'Sales' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -74,11 +78,12 @@ const MainLayout = () => {
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
+              const showBadge = item.path === '/cart' && cartItemCount > 0;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors relative ${
                     active
                       ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
@@ -86,6 +91,11 @@ const MainLayout = () => {
                 >
                   <Icon className="w-5 h-5" />
                   {item.label}
+                  {showBadge && (
+                    <span className="ml-1 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {cartItemCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

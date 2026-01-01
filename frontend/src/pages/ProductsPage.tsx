@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
+import { useCart } from '../contexts/CartContext';
 import { productsApi, productTypesApi, productSubtypesApi } from '../services/api';
 import { Product, ProductType, ProductSubtype, SortOption, SortDirection } from '../types';
-import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, Package, ShoppingCart } from 'lucide-react';
 import ProductModal from '../components/products/ProductModal';
 import ProductTypeModal from '../components/products/ProductTypeModal';
 import ProductSubtypeModal from '../components/products/ProductSubtypeModal';
@@ -10,6 +11,7 @@ import ProductInventoryDialog from '../components/products/ProductInventoryDialo
 
 const ProductsPage = () => {
   const { currentOrg } = useOrg();
+  const { addToCart, getProductQuantity } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [productSubtypes, setProductSubtypes] = useState<ProductSubtype[]>([]);
@@ -294,12 +296,14 @@ const ProductsPage = () => {
                               <ProductCard
                                 key={product.product_id}
                                 product={product}
+                                cartQuantity={getProductQuantity(product.product_id)}
                                 onEdit={() => {
                                   setSelectedProduct(product);
                                   setShowProductModal(true);
                                 }}
                                 onDelete={() => handleDeleteProduct(product.product_id)}
                                 onInventoryChange={() => handleInventoryChange(product)}
+                                onAddToCart={() => addToCart(product)}
                               />
                             ))}
                           </div>
@@ -321,12 +325,14 @@ const ProductsPage = () => {
                 <ProductCard
                   key={product.product_id}
                   product={product}
+                  cartQuantity={getProductQuantity(product.product_id)}
                   onEdit={() => {
                     setSelectedProduct(product);
                     setShowProductModal(true);
                   }}
                   onDelete={() => handleDeleteProduct(product.product_id)}
                   onInventoryChange={() => handleInventoryChange(product)}
+                  onAddToCart={() => addToCart(product)}
                 />
               ))}
             </div>
@@ -386,14 +392,18 @@ const ProductsPage = () => {
 
 const ProductCard = ({
   product,
+  cartQuantity,
   onEdit,
   onDelete,
   onInventoryChange,
+  onAddToCart,
 }: {
   product: Product;
+  cartQuantity: number;
   onEdit: () => void;
   onDelete: () => void;
   onInventoryChange: () => void;
+  onAddToCart: () => void;
 }) => {
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -403,6 +413,9 @@ const ProductCard = ({
           <p className="text-sm text-gray-600">Stock: {product.quantity}</p>
           {product.base_price && (
             <p className="text-sm text-gray-600">Price: ${parseFloat(product.base_price).toFixed(2)}</p>
+          )}
+          {cartQuantity > 0 && (
+            <p className="text-sm font-medium text-primary-600">In Cart: {cartQuantity}</p>
           )}
           {product.status && product.status.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
@@ -415,6 +428,14 @@ const ProductCard = ({
           )}
         </div>
         <div className="flex gap-1">
+          <button
+            onClick={onAddToCart}
+            className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
+            title="Add to cart"
+            disabled={product.quantity === 0}
+          >
+            <ShoppingCart className={`w-4 h-4 ${product.quantity === 0 ? 'opacity-50 cursor-not-allowed' : ''}`} />
+          </button>
           <button
             onClick={onInventoryChange}
             className="p-1 text-gray-600 hover:text-green-600 transition-colors"

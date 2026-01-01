@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import text, bindparam
+from sqlalchemy import text, bindparam, String, Integer
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, NUMERIC
 from uuid import UUID
@@ -136,12 +136,18 @@ def build_product(db: Session, product_id: UUID, build_qty: Decimal) -> dict:
 
 def record_sale(db: Session, sale: SaleCreate, org_id: UUID) -> dict:
     """Record a sale using the database function"""
+    # Use bindparam with explicit types to ensure proper PostgreSQL type casting
     result = db.execute(
-        text("SELECT record_sale(:product_id, :quantity, :unit_price, :notes)"),
+        text("SELECT record_sale(:product_id, :quantity, :unit_price, :notes)").bindparams(
+            bindparam("product_id", type_=PG_UUID),
+            bindparam("quantity", type_=Integer),
+            bindparam("unit_price", type_=NUMERIC),
+            bindparam("notes", type_=String)
+        ),
         {
             "product_id": str(sale.product_id),
             "quantity": sale.quantity,
-            "unit_price": float(sale.unit_price),
+            "unit_price": str(sale.unit_price),  # Convert to string for NUMERIC type
             "notes": sale.notes
         }
     )

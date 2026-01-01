@@ -291,4 +291,9 @@ class Sale(Base):
     organization = relationship("Organization", back_populates="sales")
     product = relationship("Product", back_populates="sales")
     transaction = relationship("InventoryTransaction", back_populates="sale")
+    
+    @property
+    def transaction_id(self):
+        """Alias for txn_id to match API schema"""
+        return self.txn_id
 
