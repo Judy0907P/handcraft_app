@@ -98,6 +98,8 @@ def update_product(product_id: UUID, product_update: schemas.ProductUpdate, db: 
     
     update_data = product_update.model_dump(exclude_unset=True)
     recipe_lines = update_data.pop('recipe_lines', None)
+    # Remove total_cost if present - it's calculated automatically from recipe
+    update_data.pop('total_cost', None)
     
     # Update product fields
     for key, value in update_data.items():

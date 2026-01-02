@@ -82,7 +82,7 @@ export interface Product {
   difficulty: string;
   quantity: number;
   alert_quantity: number;
-  base_price?: string;
+  total_cost?: string;
   image_url?: string;
   notes?: string;
   created_at: string;

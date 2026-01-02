@@ -70,7 +70,7 @@ def create_product(db: Session, product: ProductCreate) -> Product:
         difficulty=product.difficulty,
         quantity=product.quantity,
         alert_quantity=product.alert_quantity,
-        base_price=product.base_price,
+        # total_cost is calculated automatically from recipe by database trigger
         image_url=product.image_url,
         notes=product.notes
     )

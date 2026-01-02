@@ -411,8 +411,8 @@ const ProductCard = ({
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900">{product.name}</h4>
           <p className="text-sm text-gray-600">Stock: {product.quantity}</p>
-          {product.base_price && (
-            <p className="text-sm text-gray-600">Price: ${parseFloat(product.base_price).toFixed(2)}</p>
+          {product.total_cost && (
+            <p className="text-sm text-gray-600">Cost: ${parseFloat(product.total_cost).toFixed(2)}</p>
           )}
           {cartQuantity > 0 && (
             <p className="text-sm font-medium text-primary-600">In Cart: {cartQuantity}</p>

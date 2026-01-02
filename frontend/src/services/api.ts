@@ -154,7 +154,7 @@ export const productsApi = {
     difficulty: string;
     quantity: number;
     alert_quantity: number;
-    base_price?: string;
+    total_cost?: string;
     image_url?: string;
     notes?: string;
   }) => api.post<Product>('/products/', data),

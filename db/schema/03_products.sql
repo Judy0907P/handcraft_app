@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS products (
   quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
   alert_quantity INT NOT NULL DEFAULT 0 CHECK (alert_quantity >= 0),
 
-  base_price NUMERIC(10,2) CHECK (base_price >= 0),
+  total_cost NUMERIC(10,2) CHECK (total_cost >= 0),
 
   image_url TEXT,
   notes TEXT,

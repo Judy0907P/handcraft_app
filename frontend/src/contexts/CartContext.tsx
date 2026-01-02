@@ -4,7 +4,7 @@ import { Product } from '../types';
 export interface CartItem {
   product_id: string;
   quantity: number;
-  customPrice?: string; // Optional custom price, defaults to product.base_price
+  customPrice?: string; // Optional custom price, defaults to product.total_cost
   product?: Product; // Store product data for display
 }
 
@@ -92,8 +92,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return cartItems.reduce((total, item) => {
       const price = item.customPrice
         ? parseFloat(item.customPrice)
-        : item.product?.base_price
-        ? parseFloat(item.product.base_price)
+        : item.product?.total_cost
+        ? parseFloat(item.product.total_cost)
         : 0;
       return total + price * item.quantity;
     }, 0);

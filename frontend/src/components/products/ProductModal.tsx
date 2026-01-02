@@ -27,7 +27,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     difficulty: 'NA',
     quantity: 0,
     alert_quantity: 0,
-    base_price: '',
     price_currency: '',
     image_url: '',
     notes: '',
@@ -126,7 +125,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         difficulty: product.difficulty,
         quantity: product.quantity,
         alert_quantity: product.alert_quantity,
-        base_price: product.base_price || '',
         price_currency: currentOrg?.main_currency || 'USD', // Products are stored in main currency, default to main for display
         image_url: product.image_url || '',
         notes: product.notes || '',
@@ -154,7 +152,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         difficulty: 'NA',
         quantity: 0,
         alert_quantity: 0,
-        base_price: '',
         price_currency: currentOrg?.main_currency || 'USD',
         image_url: '',
         notes: '',
@@ -523,15 +520,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     setLoading(true);
 
     try {
-      // Convert base_price to main currency if input is in additional currency
-      const mainCurrency = currentOrg?.main_currency || 'USD';
-      const additionalCurrency = currentOrg?.additional_currency;
-      let base_price = formData.base_price;
-      
-      if (base_price && formData.price_currency === additionalCurrency && additionalCurrency) {
-        base_price = (parseFloat(base_price) / EXCHANGE_RATE).toFixed(2);
-      }
-
       const data: any = {
         name: formData.name,
         description: formData.description || undefined,
@@ -544,7 +532,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
         difficulty: formData.difficulty,
         quantity: 0, // Quantity always starts at 0 for new products, can only be changed via inventory transactions
         alert_quantity: formData.alert_quantity,
-        base_price: base_price ? base_price : undefined,
+        // total_cost is calculated automatically from recipe by database trigger
         image_url: formData.image_url || undefined,
         notes: formData.notes || undefined,
       };
@@ -664,72 +652,23 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Alert Quantity</label>
-              <input
-                type="number"
-                value={formData.alert_quantity === 0 ? '' : formData.alert_quantity}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    setFormData({ ...formData, alert_quantity: 0 });
-                    return;
-                  }
-                  const numValue = parseInt(value.replace(/^0+/, '') || '0', 10);
-                  setFormData({ ...formData, alert_quantity: isNaN(numValue) ? 0 : numValue });
-                }}
-                min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base Price</label>
-              {currentOrg?.additional_currency && (
-                <div className="mb-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Currency</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="price_currency"
-                        value={currentOrg.main_currency}
-                        checked={formData.price_currency === currentOrg.main_currency}
-                        onChange={(e) => setFormData({ ...formData, price_currency: currentOrg.main_currency })}
-                        className="mr-2"
-                      />
-                      <span>{currentOrg.main_currency}</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="price_currency"
-                        value={currentOrg.additional_currency}
-                        checked={formData.price_currency === currentOrg.additional_currency}
-                        onChange={(e) => setFormData({ ...formData, price_currency: currentOrg.additional_currency })}
-                        className="mr-2"
-                      />
-                      <span>{currentOrg.additional_currency}</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-              <input
-                type="number"
-                step="0.01"
-                value={formData.base_price}
-                onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
-                min="0"
-                placeholder={`Enter base price in ${formData.price_currency || currentOrg?.main_currency || 'USD'}`}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              {formData.base_price && formData.price_currency === currentOrg?.additional_currency && currentOrg?.additional_currency && (
-                <p className="mt-1 text-xs text-gray-500">
-                  ≈ {(parseFloat(formData.base_price) / EXCHANGE_RATE).toFixed(2)} {currentOrg.main_currency}
-                </p>
-              )}
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Alert Quantity</label>
+            <input
+              type="number"
+              value={formData.alert_quantity === 0 ? '' : formData.alert_quantity}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setFormData({ ...formData, alert_quantity: 0 });
+                  return;
+                }
+                const numValue = parseInt(value.replace(/^0+/, '') || '0', 10);
+                setFormData({ ...formData, alert_quantity: isNaN(numValue) ? 0 : numValue });
+              }}
+              min="0"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -963,7 +902,17 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Recipe</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Recipe</label>
+              {calculateRecipeTotalCost() > 0 && (
+                <div className="text-sm">
+                  <span className="text-gray-600">Calculated Total Cost: </span>
+                  <span className="font-semibold text-gray-900">
+                    ${calculateRecipeTotalCost().toFixed(2)} {currentOrg?.main_currency || 'USD'}
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="space-y-2">
               {recipeLines.map((line, index) => {
                 const part = availableParts.find(p => p.part_id === line.part_id);

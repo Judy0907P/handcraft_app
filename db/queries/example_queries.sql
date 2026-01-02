@@ -112,12 +112,12 @@ SELECT
   product_id,
   name,
   quantity AS available_stock,
-  base_price
+  total_cost
 FROM products
 WHERE product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   AND org_id = '22222222-2222-2222-2222-222222222222';
 
--- Sell 2 units of Blue Bead Bracelet at $18.00 each (above base price)
+-- Sell 2 units of Blue Bead Bracelet at $18.00 each (above total cost)
 SELECT record_sale(
   '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa',  -- product_id
   2,                                        -- quantity
@@ -167,7 +167,7 @@ LIMIT 5;
 -- View profit summary for all products
 SELECT 
   product_name,
-  base_price,
+  total_cost,
   total_sold,
   avg_selling_price,
   cost_per_unit,
@@ -186,7 +186,7 @@ ORDER BY total_profit DESC;
 -- Detailed profit breakdown for a specific product
 SELECT 
   p.name AS product_name,
-  p.base_price,
+  p.total_cost,
   COUNT(s.sale_id) AS number_of_sales,
   COALESCE(SUM(s.quantity), 0) AS total_units_sold,
   COALESCE(SUM(s.total_revenue), 0) AS total_revenue,
@@ -215,7 +215,7 @@ SELECT
 FROM products p
 LEFT JOIN sales s ON s.product_id = p.product_id
 WHERE p.product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-GROUP BY p.product_id, p.name, p.base_price;
+GROUP BY p.product_id, p.name, p.total_cost;
 
 -- ============================================================
 -- 5. INVENTORY STATUS QUERIES
@@ -240,7 +240,7 @@ ORDER BY pt.type_name, ps.subtype_name, p.name;
 SELECT 
   p.name,
   p.quantity AS stock,
-  p.base_price,
+  p.total_cost,
   p.alert_quantity,
   CASE 
     WHEN p.quantity <= p.alert_quantity THEN 'LOW STOCK'

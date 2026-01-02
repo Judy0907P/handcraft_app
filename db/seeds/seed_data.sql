@@ -60,7 +60,7 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- 7. Create products
-INSERT INTO products (product_id, org_id, name, description, primary_color, secondary_color, product_subtype_id, status, is_self_made, difficulty, quantity, base_price)
+INSERT INTO products (product_id, org_id, name, description, primary_color, secondary_color, product_subtype_id, status, is_self_made, difficulty, quantity, total_cost)
 VALUES 
   ('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'Blue Bead Bracelet', 'Beautiful blue glass bead bracelet', 'Blue', 'White', 'ffffffff-ffff-ffff-ffff-ffffffffffff', ARRAY['active'], true, 'easy', 0, 15.00),
   ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Red Bead Necklace', 'Elegant red glass bead necklace', 'Red', 'Brown', '99999999-9999-9999-9999-999999999999', ARRAY['active'], true, 'medium', 0, 25.00)

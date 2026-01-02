@@ -22,11 +22,18 @@ const CartPage = () => {
     }
   }, [currentOrg, cartItems.length]);
 
+  // Reload products when cart items change to ensure we have fresh data
+  useEffect(() => {
+    if (currentOrg && cartItems.length > 0 && products.length === 0) {
+      loadProducts();
+    }
+  }, [cartItems, currentOrg]);
+
   const loadProducts = async () => {
     if (!currentOrg) return;
     try {
       const productIds = cartItems.map((item) => item.product_id);
-      // Fetch all products and filter
+      // Fetch all products and filter - this ensures we have fresh data including updated total_cost
       const response = await productsApi.getAll(currentOrg.org_id);
       const fetchedProducts = response.data.filter((p) => productIds.includes(p.product_id));
       setProducts(fetchedProducts);
@@ -38,11 +45,13 @@ const CartPage = () => {
   };
 
   const getProduct = (productId: string): Product | undefined => {
-    // First check if product is in cart item (from context)
+    // Always prioritize fresh product data from the products array (fetched from API)
+    // This ensures we have the latest total_cost from the database
+    const freshProduct = products.find((p) => p.product_id === productId);
+    if (freshProduct) return freshProduct;
+    // Fall back to cart item product data if fresh data not available yet
     const cartItem = cartItems.find((item) => item.product_id === productId);
-    if (cartItem?.product) return cartItem.product;
-    // Otherwise find in products array (fetched for stock updates)
-    return products.find((p) => p.product_id === productId);
+    return cartItem?.product;
   };
 
   const handleCheckout = async () => {
@@ -51,7 +60,7 @@ const CartPage = () => {
     // Validate all items have prices
     for (const item of cartItems) {
       const product = getProduct(item.product_id);
-      const price = item.customPrice || product?.base_price;
+      const price = item.customPrice || product?.total_cost;
       if (!price || parseFloat(price) <= 0) {
         alert(`Please set a price for ${product?.name || 'item'}`);
         return;
@@ -71,7 +80,7 @@ const CartPage = () => {
       // Create a sale for each cart item
       const salePromises = cartItems.map((item) => {
         const product = getProduct(item.product_id);
-        const unitPrice = item.customPrice || product?.base_price || '0';
+        const unitPrice = item.customPrice || product?.total_cost || '0';
         return salesApi.create(currentOrg.org_id, {
           product_id: item.product_id,
           quantity: item.quantity,
@@ -161,7 +170,7 @@ const CartPage = () => {
                   Quantity
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Base Price
+                  Total Cost
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Selling Price
@@ -179,8 +188,11 @@ const CartPage = () => {
                 const product = getProduct(item.product_id);
                 if (!product) return null;
 
-                const basePrice = product.base_price ? parseFloat(product.base_price) : 0;
-                const sellingPrice = item.customPrice ? parseFloat(item.customPrice) : basePrice;
+                // Parse total_cost - match the same logic as ProductsPage
+                // ProductsPage shows: product.total_cost ? parseFloat(product.total_cost).toFixed(2) : (doesn't show)
+                // So we should parse the same way
+                const totalCost = product.total_cost ? parseFloat(product.total_cost) : 0;
+                const sellingPrice = item.customPrice ? parseFloat(item.customPrice) : totalCost;
                 const subtotal = sellingPrice * item.quantity;
 
                 return (
@@ -246,7 +258,7 @@ const CartPage = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${basePrice.toFixed(2)}
+                      ${totalCost.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -255,9 +267,9 @@ const CartPage = () => {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={item.customPrice || product.base_price || '0'}
+                          value={item.customPrice || product.total_cost || '0'}
                           onChange={(e) => updateCustomPrice(item.product_id, e.target.value)}
-                          placeholder={product.base_price || '0.00'}
+                          placeholder={product.total_cost || '0.00'}
                           className="w-24 px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                       </div>

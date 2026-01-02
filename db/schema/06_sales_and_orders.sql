@@ -149,7 +149,7 @@ SELECT
   p.product_id,
   p.org_id,
   p.name AS product_name,
-  p.base_price,
+  p.total_cost,
   COALESCE(ss.total_revenue, 0) AS total_revenue,
   COALESCE(ss.total_sold, 0) AS total_sold,
   COALESCE(ss.avg_selling_price, 0) AS avg_selling_price,

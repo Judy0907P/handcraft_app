@@ -199,7 +199,7 @@ class Product(Base):
     difficulty = Column(Text, nullable=False, default="NA")
     quantity = Column(Integer, nullable=False, default=0)
     alert_quantity = Column(Integer, nullable=False, default=0)
-    base_price = Column(Numeric(10, 2))
+    total_cost = Column(Numeric(10, 2))
     image_url = Column(Text)
     notes = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())

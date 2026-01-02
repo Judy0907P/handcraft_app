@@ -173,7 +173,7 @@ Content-Type: application/json
   "difficulty": "easy",
   "quantity": 0,
   "alert_quantity": 5,
-  "base_price": "15.00"
+  "total_cost": "15.00"
 }
 ```
 
@@ -194,7 +194,7 @@ Content-Type: application/json
 
 {
   "quantity": 10,
-  "base_price": "16.00"
+  "total_cost": "16.00"
 }
 ```
 

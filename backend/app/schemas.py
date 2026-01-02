@@ -111,7 +111,7 @@ class ProductBase(BaseModel):
     difficulty: str = "NA"
     quantity: int = Field(ge=0, default=0)
     alert_quantity: int = Field(ge=0, default=0)
-    base_price: Optional[Decimal] = Field(None, ge=0)
+    total_cost: Optional[Decimal] = Field(None, description="Calculated automatically from recipe parts cost")
     image_url: Optional[str] = None
     notes: Optional[str] = None
 
@@ -132,7 +132,7 @@ class ProductUpdate(BaseModel):
     difficulty: Optional[str] = None
     quantity: Optional[int] = Field(None, ge=0)
     alert_quantity: Optional[int] = Field(None, ge=0)
-    base_price: Optional[Decimal] = Field(None, ge=0)
+    # total_cost is calculated automatically from recipe, not manually set
     image_url: Optional[str] = None
     notes: Optional[str] = None
     recipe_lines: Optional[List[RecipeLineBase]] = Field(None, description="Optional recipe lines to replace all existing recipe lines")
@@ -208,7 +208,7 @@ class ProductProfitSummary(BaseModel):
     product_id: UUID
     org_id: UUID
     product_name: str
-    base_price: Optional[Decimal]
+    total_cost: Optional[Decimal]
     total_revenue: Decimal
     total_sold: int
     avg_selling_price: Decimal

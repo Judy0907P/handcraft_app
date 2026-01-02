@@ -76,7 +76,7 @@ const SaleModal = ({ products, onClose, onSave }: SaleModalProps) => {
                 setFormData({
                   ...formData,
                   product_id: e.target.value,
-                  unit_price: product?.base_price || '',
+                  unit_price: product?.total_cost || '',
                 });
               }}
               required
@@ -86,7 +86,7 @@ const SaleModal = ({ products, onClose, onSave }: SaleModalProps) => {
               {products
                 .map((product) => (
                   <option key={product.product_id} value={product.product_id}>
-                    {product.name} {product.base_price ? `($${parseFloat(product.base_price).toFixed(2)})` : ''}
+                    {product.name} {product.total_cost ? `($${parseFloat(product.total_cost).toFixed(2)})` : ''}
                   </option>
                 ))}
             </select>
@@ -97,9 +97,9 @@ const SaleModal = ({ products, onClose, onSave }: SaleModalProps) => {
               <p className="text-sm text-gray-600">
                 Available stock: <span className="font-medium">{selectedProduct.quantity}</span>
               </p>
-              {selectedProduct.base_price && (
+              {selectedProduct.total_cost && (
                 <p className="text-sm text-gray-600 mt-1">
-                  Base price: <span className="font-medium">${parseFloat(selectedProduct.base_price).toFixed(2)}</span>
+                  Total cost: <span className="font-medium">${parseFloat(selectedProduct.total_cost).toFixed(2)}</span>
                 </p>
               )}
             </div>

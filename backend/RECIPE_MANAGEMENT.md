@@ -20,7 +20,7 @@ Content-Type: application/json
   "status": ["active"],
   "is_self_made": true,
   "difficulty": "easy",
-  "base_price": "15.00",
+  "total_cost": "15.00",
   "recipe_lines": [
     {
       "part_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
