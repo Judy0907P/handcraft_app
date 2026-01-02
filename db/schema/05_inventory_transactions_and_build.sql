@@ -8,7 +8,7 @@ BEGIN;
 --   org scoping via org_id
 ---------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS inventory_transactions (
+CREATE TABLE IF NOT EXISTS product_transactions (
   txn_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
 
@@ -18,27 +18,41 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   product_id UUID REFERENCES products(product_id) ON DELETE SET NULL,
 
   -- qty of product for build/sale/loss
-  qty NUMERIC(12,4) NOT NULL,
+  qty INT NOT NULL,
+
+  unit_price_for_sale NUMERIC(10,2) NOT NULL CHECK (unit_price_for_sale >= 0),
 
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_inventory_txn_org_id ON inventory_transactions(org_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_txn_product_id ON inventory_transactions(product_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_txn_created_at ON inventory_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_product_txn_org_id ON product_transactions(org_id);
+CREATE INDEX IF NOT EXISTS idx_product_txn_product_id ON product_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_txn_created_at ON product_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_product_txn_type ON product_transactions(txn_type);
 
-CREATE TABLE IF NOT EXISTS inventory_transaction_lines (
-  txn_id UUID NOT NULL REFERENCES inventory_transactions(txn_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS part_transactions (
+  txn_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   part_id UUID NOT NULL REFERENCES parts(part_id) ON DELETE RESTRICT,
 
-  -- parts stock delta; consumption is negative (e.g., -2)
-  qty_delta NUMERIC(12,4) NOT NULL,
+  txn_type TEXT NOT NULL CHECK (txn_type IN ('build_product', 'loss', 'purchase')),
 
-  PRIMARY KEY (txn_id, part_id)
+  -- parts stock delta (positive for purchase, negative for build_product/loss)
+  qty INT NOT NULL,
+
+  unit_price_for_purchase NUMERIC(10,2) NOT NULL CHECK (unit_price_for_purchase >= 0),
+
+  -- Only set for build_product transactions, NULL for purchase/loss
+  product_txn_id UUID REFERENCES product_transactions(txn_id) ON DELETE CASCADE,
+
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_inventory_txn_lines_part_id ON inventory_transaction_lines(part_id);
+CREATE INDEX IF NOT EXISTS idx_part_txn_part_id ON part_transactions(part_id);
+CREATE INDEX IF NOT EXISTS idx_part_txn_product_txn_id ON part_transactions(product_txn_id);
+CREATE INDEX IF NOT EXISTS idx_part_txn_type ON part_transactions(txn_type);
+CREATE INDEX IF NOT EXISTS idx_part_txn_created_at ON part_transactions(created_at);
 
 ---------------------------------------------------------------------
 -- build_product(product_id, build_qty) -> returns txn_id
@@ -121,17 +135,20 @@ BEGIN
     RAISE EXCEPTION 'Insufficient parts inventory for product % (qty=%)', p_product_id, p_build_qty;
   END IF;
 
-  -- 4) Insert txn header
-  INSERT INTO inventory_transactions (org_id, txn_type, product_id, qty, notes)
-  VALUES (v_org_id, 'build_product', p_product_id, p_build_qty, 'auto build')
+  -- 4) Insert product transaction header
+  INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, notes)
+  VALUES (v_org_id, 'build_product', p_product_id, CEIL(p_build_qty)::INT, 0, 'auto build')
   RETURNING txn_id INTO v_txn_id;
 
-  -- 5) Insert txn lines (each part consumption)
-  INSERT INTO inventory_transaction_lines (txn_id, part_id, qty_delta)
+  -- 5) Insert part transactions (each part consumption)
+  INSERT INTO part_transactions (part_id, txn_type, qty, unit_price_for_purchase, product_txn_id, notes)
   SELECT
-    v_txn_id,
     rl.part_id,
-    -(rl.quantity * p_build_qty)
+    'build_product',
+    -CEIL(rl.quantity * p_build_qty)::INT,
+    0,
+    v_txn_id,
+    NULL  -- notes can be NULL for build_product transactions
   FROM recipe_lines rl
   WHERE rl.product_id = p_product_id;
 

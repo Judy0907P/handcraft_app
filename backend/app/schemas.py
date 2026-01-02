@@ -166,7 +166,7 @@ class BuildProductResponse(BaseModel):
 class ProductInventoryAdjustmentRequest(BaseModel):
     product_id: UUID
     txn_type: str = Field(..., description="Transaction type: 'loss' (decreases inventory)")
-    qty: Decimal = Field(..., description="Quantity to decrease (must be positive)")
+    qty: int = Field(..., gt=0, description="Quantity to decrease (must be positive)")
     notes: Optional[str] = None
 
 
@@ -174,12 +174,12 @@ class ProductInventoryAdjustmentResponse(BaseModel):
     transaction_id: UUID
     product_id: UUID
     txn_type: str
-    qty: Decimal
+    qty: int
     new_product_quantity: int
     message: str
 
 
-# Sale Schemas
+# Sale Schemas (now using ProductTransaction)
 class SaleCreate(BaseModel):
     product_id: UUID
     quantity: int = Field(gt=0)
@@ -188,19 +188,43 @@ class SaleCreate(BaseModel):
 
 
 class SaleResponse(BaseModel):
-    sale_id: UUID
+    txn_id: UUID
     org_id: UUID
     product_id: UUID
-    transaction_id: UUID
-    quantity: int
-    unit_price: Decimal
-    total_revenue: Decimal
-    sale_date: datetime
+    txn_type: str
+    qty: int
+    unit_price_for_sale: Decimal
+    total_revenue: Decimal  # Calculated as qty * unit_price_for_sale
     notes: Optional[str] = None
     created_at: datetime
     
     class Config:
         from_attributes = True
+    
+    @classmethod
+    def from_product_transaction(cls, txn) -> "SaleResponse":
+        """Create SaleResponse from ProductTransaction"""
+        from datetime import datetime
+        # Handle created_at which is stored as Text in the model
+        if isinstance(txn.created_at, str):
+            try:
+                created_at = datetime.fromisoformat(txn.created_at.replace('Z', '+00:00'))
+            except:
+                created_at = datetime.fromisoformat(txn.created_at)
+        else:
+            created_at = txn.created_at
+        
+        return cls(
+            txn_id=txn.txn_id,
+            org_id=txn.org_id,
+            product_id=txn.product_id,
+            txn_type=txn.txn_type,
+            qty=txn.qty,
+            unit_price_for_sale=txn.unit_price_for_sale,
+            total_revenue=txn.qty * txn.unit_price_for_sale,
+            notes=txn.notes,
+            created_at=created_at
+        )
 
 
 # Profit Summary Schema

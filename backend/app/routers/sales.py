@@ -4,7 +4,7 @@ from typing import List
 from uuid import UUID
 from app.database import get_db
 from app import schemas, services
-from app.models import Sale
+from app.models import ProductTransaction
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -27,7 +27,7 @@ def create_sale(sale: schemas.SaleCreate, org_id: UUID, db: Session = Depends(ge
             )
         
         result = services.record_sale(db, sale, org_id)
-        return result
+        return schemas.SaleResponse.from_product_transaction(result)
     except Exception as e:
         error_msg = str(e)
         if "not found" in error_msg.lower():
@@ -47,26 +47,37 @@ def create_sale(sale: schemas.SaleCreate, org_id: UUID, db: Session = Depends(ge
             )
 
 
-@router.get("/{sale_id}", response_model=schemas.SaleResponse)
-def get_sale(sale_id: UUID, db: Session = Depends(get_db)):
-    """Get a sale by ID"""
-    sale = db.query(Sale).filter(Sale.sale_id == sale_id).first()
-    if not sale:
+@router.get("/{txn_id}", response_model=schemas.SaleResponse)
+def get_sale(txn_id: UUID, db: Session = Depends(get_db)):
+    """Get a sale by transaction ID"""
+    txn = db.query(ProductTransaction).filter(
+        ProductTransaction.txn_id == txn_id,
+        ProductTransaction.txn_type == 'sale'
+    ).first()
+    if not txn:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sale not found"
         )
-    return sale
+    return schemas.SaleResponse.from_product_transaction(txn)
 
 
 @router.get("/org/{org_id}", response_model=List[schemas.SaleResponse])
 def get_sales_by_org(org_id: UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all sales for an organization"""
-    return db.query(Sale).filter(Sale.org_id == org_id).offset(skip).limit(limit).all()
+    txns = db.query(ProductTransaction).filter(
+        ProductTransaction.org_id == org_id,
+        ProductTransaction.txn_type == 'sale'
+    ).offset(skip).limit(limit).all()
+    return [schemas.SaleResponse.from_product_transaction(txn) for txn in txns]
 
 
 @router.get("/product/{product_id}", response_model=List[schemas.SaleResponse])
 def get_sales_by_product(product_id: UUID, db: Session = Depends(get_db)):
     """Get all sales for a product"""
-    return db.query(Sale).filter(Sale.product_id == product_id).all()
+    txns = db.query(ProductTransaction).filter(
+        ProductTransaction.product_id == product_id,
+        ProductTransaction.txn_type == 'sale'
+    ).all()
+    return [schemas.SaleResponse.from_product_transaction(txn) for txn in txns]
 

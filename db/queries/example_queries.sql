@@ -83,21 +83,21 @@ SELECT
   p.name AS product_name,
   txn.qty,
   txn.created_at
-FROM inventory_transactions txn
+FROM product_transactions txn
 JOIN products p ON p.product_id = txn.product_id
 WHERE txn.txn_type = 'build_product'
   AND txn.product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 ORDER BY txn.created_at DESC
 LIMIT 5;
 
--- Check transaction lines (parts consumed)
+-- Check part transactions (parts consumed)
 SELECT 
   txn.txn_id,
   pa.name AS part_name,
-  txl.qty_delta AS parts_consumed
-FROM inventory_transactions txn
-JOIN inventory_transaction_lines txl ON txl.txn_id = txn.txn_id
-JOIN parts pa ON pa.part_id = txl.part_id
+  pt.qty AS parts_consumed
+FROM product_transactions txn
+JOIN part_transactions pt ON pt.product_txn_id = txn.txn_id
+JOIN parts pa ON pa.part_id = pt.part_id
 WHERE txn.txn_type = 'build_product'
   AND txn.product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 ORDER BY txn.created_at DESC, pa.name
@@ -146,14 +146,15 @@ WHERE s.product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 ORDER BY s.sale_date DESC
 LIMIT 5;
 
--- Check the inventory transaction was created
+-- Check the product transaction was created
 SELECT 
   txn.txn_id,
   txn.txn_type,
   p.name AS product_name,
   txn.qty,
+  txn.unit_price_for_sale,
   txn.created_at
-FROM inventory_transactions txn
+FROM product_transactions txn
 JOIN products p ON p.product_id = txn.product_id
 WHERE txn.txn_type = 'sale'
   AND txn.product_id = '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'

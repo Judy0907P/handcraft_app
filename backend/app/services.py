@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID, NUMERIC
 from uuid import UUID
 from decimal import Decimal
 from typing import Optional
-from app.models import Part, Product, InventoryTransaction, Sale, RecipeLine
+from app.models import Part, Product, ProductTransaction, PartTransaction, RecipeLine
 from app.schemas import PartCreate, ProductCreate, SaleCreate, BuildProductRequest
 
 
@@ -134,30 +134,35 @@ def build_product(db: Session, product_id: UUID, build_qty: Decimal) -> dict:
     }
 
 
-def record_sale(db: Session, sale: SaleCreate, org_id: UUID) -> dict:
+def record_sale(db: Session, sale: SaleCreate, org_id: UUID) -> ProductTransaction:
     """Record a sale using the database function"""
-    # Use bindparam with explicit types to ensure proper PostgreSQL type casting
+    # Use explicit CAST in SQL to ensure PostgreSQL receives correct types
+    # Handle NULL notes properly
+    notes_value = sale.notes if sale.notes is not None else None
+    
     result = db.execute(
-        text("SELECT record_sale(:product_id, :quantity, :unit_price, :notes)").bindparams(
-            bindparam("product_id", type_=PG_UUID),
-            bindparam("quantity", type_=Integer),
-            bindparam("unit_price", type_=NUMERIC),
-            bindparam("notes", type_=String)
-        ),
+        text("""
+            SELECT record_sale(
+                CAST(:product_id AS UUID),
+                CAST(:quantity AS INTEGER),
+                CAST(:unit_price AS NUMERIC),
+                CAST(:notes AS TEXT)
+            )
+        """),
         {
             "product_id": str(sale.product_id),
             "quantity": sale.quantity,
             "unit_price": str(sale.unit_price),  # Convert to string for NUMERIC type
-            "notes": sale.notes
+            "notes": notes_value
         }
     )
-    sale_id = result.scalar()
+    txn_id = result.scalar()
     db.commit()
     
-    # Get the created sale record
-    db_sale = db.query(Sale).filter(Sale.sale_id == sale_id).first()
+    # Get the created product transaction
+    db_txn = db.query(ProductTransaction).filter(ProductTransaction.txn_id == txn_id).first()
     
-    return db_sale
+    return db_txn
 
 
 def get_profit_summary(db: Session, org_id: UUID):
@@ -169,7 +174,7 @@ def get_profit_summary(db: Session, org_id: UUID):
     return result.fetchall()
 
 
-def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: Decimal, notes: Optional[str] = None) -> dict:
+def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: int, notes: Optional[str] = None) -> dict:
     """
     Adjust product inventory for loss transactions (decreases inventory).
     For build_product, use build_product() function instead.
@@ -180,11 +185,11 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
     
     This function:
     1. Validates the product exists
-    2. Creates an inventory transaction record
+    2. Creates a product transaction record
     3. Updates product quantity (decreases)
     4. Does NOT modify parts inventory (unlike build_product)
     """
-    from app.models import Product, InventoryTransaction
+    from app.models import Product, ProductTransaction
     
     # Validate transaction type
     valid_types = ['loss']
@@ -192,10 +197,7 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
         raise ValueError(f"Invalid txn_type. Must be one of: {', '.join(valid_types)}")
     
     # Validate quantity
-    from decimal import Decimal as Dec
-    qty_decimal = Dec(str(qty))
-    
-    if qty_decimal <= 0:
+    if qty <= 0:
         raise ValueError("Loss quantity must be greater than 0 (positive)")
     
     # Get product
@@ -204,18 +206,18 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
         raise ValueError(f"Product {product_id} not found")
     
     # Calculate new quantity (loss always decreases)
-    qty_int = int(qty_decimal)
-    new_quantity = product.quantity - qty_int  # Loss decreases inventory
+    new_quantity = product.quantity - qty  # Loss decreases inventory
     
     if new_quantity < 0:
-        raise ValueError(f"Insufficient inventory. Current: {product.quantity}, Loss: {qty_int}")
+        raise ValueError(f"Insufficient inventory. Current: {product.quantity}, Loss: {qty}")
     
-    # Create inventory transaction
-    transaction = InventoryTransaction(
+    # Create product transaction (unit_price_for_sale is 0 for loss)
+    transaction = ProductTransaction(
         org_id=product.org_id,
         txn_type=txn_type,
         product_id=product_id,
-        qty=qty_decimal,  # Store positive value
+        qty=qty,  # Store as int
+        unit_price_for_sale=Decimal('0'),  # Loss has no sale price
         notes=notes
     )
     db.add(transaction)

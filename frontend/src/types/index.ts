@@ -91,14 +91,13 @@ export interface Product {
 }
 
 export interface Sale {
-  sale_id: string;
+  txn_id: string;
   org_id: string;
   product_id: string;
-  transaction_id: string;
-  quantity: number;
-  unit_price: string;
+  txn_type: string;
+  qty: number;
+  unit_price_for_sale: string;
   total_revenue: string;
-  sale_date: string;
   notes?: string;
   created_at: string;
 }

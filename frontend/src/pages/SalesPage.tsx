@@ -44,13 +44,13 @@ const SalesPage = () => {
       let comparison = 0;
       switch (sortBy) {
         case 'quantity':
-          comparison = a.quantity - b.quantity;
+          comparison = a.qty - b.qty;
           break;
         case 'amount':
           comparison = parseFloat(a.total_revenue) - parseFloat(b.total_revenue);
           break;
         case 'date':
-          comparison = new Date(a.sale_date).getTime() - new Date(b.sale_date).getTime();
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
       }
       return -comparison; // Descending order
@@ -62,7 +62,7 @@ const SalesPage = () => {
   };
 
   const totalRevenue = sales.reduce((sum, sale) => sum + parseFloat(sale.total_revenue), 0);
-  const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+  const totalQuantity = sales.reduce((sum, sale) => sum + sale.qty, 0);
 
   if (loading) {
     return (
@@ -168,21 +168,21 @@ const SalesPage = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSales().map((sale) => (
-                <tr key={sale.sale_id} className="hover:bg-gray-50">
+                <tr key={sale.txn_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      {format(new Date(sale.sale_date), 'MMM dd, yyyy')}
+                      {format(new Date(sale.created_at), 'MMM dd, yyyy')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {getProductName(sale.product_id)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {sale.quantity}
+                    {sale.qty}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${parseFloat(sale.unit_price).toFixed(2)}
+                    ${parseFloat(sale.unit_price_for_sale).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                     ${parseFloat(sale.total_revenue).toFixed(2)}

@@ -37,8 +37,7 @@ class Organization(Base):
     memberships = relationship("OrgMembership", back_populates="organization", cascade="all, delete-orphan")
     parts = relationship("Part", back_populates="organization", cascade="all, delete-orphan")
     products = relationship("Product", back_populates="organization", cascade="all, delete-orphan")
-    transactions = relationship("InventoryTransaction", back_populates="organization", cascade="all, delete-orphan")
-    sales = relationship("Sale", back_populates="organization", cascade="all, delete-orphan")
+    product_transactions = relationship("ProductTransaction", back_populates="organization", cascade="all, delete-orphan")
     part_status_labels = relationship("PartStatusLabel", back_populates="organization", cascade="all, delete-orphan")
     product_status_labels = relationship("ProductStatusLabel", back_populates="organization", cascade="all, delete-orphan")
 
@@ -118,7 +117,7 @@ class Part(Base):
     organization = relationship("Organization", back_populates="parts")
     subtype = relationship("PartSubtype", back_populates="parts")
     recipe_lines = relationship("RecipeLine", back_populates="part")
-    transaction_lines = relationship("InventoryTransactionLine", back_populates="part")
+    part_transactions = relationship("PartTransaction", back_populates="part")
 
 
 class PartStatusLabel(Base):
@@ -215,8 +214,7 @@ class Product(Base):
     organization = relationship("Organization", back_populates="products")
     subtype = relationship("ProductSubtype", back_populates="products")
     recipe_lines = relationship("RecipeLine", back_populates="product", cascade="all, delete-orphan")
-    transactions = relationship("InventoryTransaction", back_populates="product")
-    sales = relationship("Sale", back_populates="product")
+    product_transactions = relationship("ProductTransaction", back_populates="product")
 
 
 class RecipeLine(Base):
@@ -235,65 +233,48 @@ class RecipeLine(Base):
     part = relationship("Part", back_populates="recipe_lines")
 
 
-class InventoryTransaction(Base):
-    __tablename__ = "inventory_transactions"
+class ProductTransaction(Base):
+    __tablename__ = "product_transactions"
     
     txn_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
     txn_type = Column(Text, nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.product_id", ondelete="SET NULL"))
-    qty = Column(Numeric(12, 4), nullable=False)
+    qty = Column(Integer, nullable=False)
+    unit_price_for_sale = Column(Numeric(10, 2), nullable=False)
     notes = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (
-        CheckConstraint("txn_type IN ('build_product', 'loss', 'sale')", name="inventory_transactions_txn_type_check"),
-        CheckConstraint("qty > 0", name="inventory_transactions_qty_check"),
+        CheckConstraint("txn_type IN ('build_product', 'loss', 'sale')", name="product_transactions_txn_type_check"),
+        CheckConstraint("qty > 0", name="product_transactions_qty_check"),
+        CheckConstraint("unit_price_for_sale >= 0", name="product_transactions_unit_price_check"),
     )
     
-    organization = relationship("Organization", back_populates="transactions")
-    product = relationship("Product", back_populates="transactions")
-    transaction_lines = relationship("InventoryTransactionLine", back_populates="transaction", cascade="all, delete-orphan")
-    sale = relationship("Sale", back_populates="transaction", uselist=False)
+    organization = relationship("Organization", back_populates="product_transactions")
+    product = relationship("Product", back_populates="product_transactions")
+    part_transactions = relationship("PartTransaction", back_populates="product_transaction", cascade="all, delete-orphan")
 
 
-class InventoryTransactionLine(Base):
-    __tablename__ = "inventory_transaction_lines"
+class PartTransaction(Base):
+    __tablename__ = "part_transactions"
     
-    txn_id = Column(UUID(as_uuid=True), ForeignKey("inventory_transactions.txn_id", ondelete="CASCADE"), primary_key=True)
-    part_id = Column(UUID(as_uuid=True), ForeignKey("parts.part_id", ondelete="RESTRICT"), primary_key=True)
-    qty_delta = Column(Numeric(12, 4), nullable=False)
-    
-    transaction = relationship("InventoryTransaction", back_populates="transaction_lines")
-    part = relationship("Part", back_populates="transaction_lines")
-
-
-class Sale(Base):
-    __tablename__ = "sales"
-    
-    sale_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.product_id", ondelete="RESTRICT"), nullable=False)
-    txn_id = Column(UUID(as_uuid=True), ForeignKey("inventory_transactions.txn_id", ondelete="RESTRICT"), nullable=False)
-    quantity = Column(Integer, nullable=False)
-    unit_price = Column(Numeric(10, 2), nullable=False)
-    total_revenue = Column(Numeric(10, 2), nullable=False)
-    sale_date = Column(Text, nullable=False, server_default=func.now())
-    notes = Column(Text)
+    txn_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    part_id = Column(UUID(as_uuid=True), ForeignKey("parts.part_id", ondelete="RESTRICT"), nullable=False)
+    txn_type = Column(Text, nullable=False)
+    qty = Column(Integer, nullable=False)
+    unit_price_for_purchase = Column(Numeric(10, 2), nullable=False)
+    product_txn_id = Column(UUID(as_uuid=True), ForeignKey("product_transactions.txn_id", ondelete="CASCADE"), nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
     __table_args__ = (
-        CheckConstraint("quantity > 0", name="sales_quantity_check"),
-        CheckConstraint("unit_price >= 0", name="sales_unit_price_check"),
-        CheckConstraint("total_revenue >= 0", name="sales_total_revenue_check"),
+        CheckConstraint("txn_type IN ('build_product', 'loss', 'purchase')", name="part_transactions_txn_type_check"),
+        CheckConstraint("unit_price_for_purchase >= 0", name="part_transactions_unit_price_check"),
     )
     
-    organization = relationship("Organization", back_populates="sales")
-    product = relationship("Product", back_populates="sales")
-    transaction = relationship("InventoryTransaction", back_populates="sale")
-    
-    @property
-    def transaction_id(self):
-        """Alias for txn_id to match API schema"""
-        return self.txn_id
+    part = relationship("Part", back_populates="part_transactions")
+    product_transaction = relationship("ProductTransaction", back_populates="part_transactions")
+
+
 
