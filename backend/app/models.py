@@ -242,6 +242,7 @@ class ProductTransaction(Base):
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.product_id", ondelete="SET NULL"))
     qty = Column(Integer, nullable=False)
     unit_price_for_sale = Column(Numeric(10, 2), nullable=False)
+    unit_cost_at_sale = Column(Numeric(10, 2), nullable=False)
     notes = Column(Text)
     created_at = Column(Text, nullable=False, server_default=func.now())
     
@@ -249,6 +250,7 @@ class ProductTransaction(Base):
         CheckConstraint("txn_type IN ('build_product', 'loss', 'sale')", name="product_transactions_txn_type_check"),
         CheckConstraint("qty > 0", name="product_transactions_qty_check"),
         CheckConstraint("unit_price_for_sale >= 0", name="product_transactions_unit_price_check"),
+        CheckConstraint("unit_cost_at_sale >= 0", name="product_transactions_unit_cost_at_sale_check"),
     )
     
     organization = relationship("Organization", back_populates="product_transactions")

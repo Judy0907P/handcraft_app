@@ -34,6 +34,19 @@ const ProductsPage = () => {
     }
   }, [currentOrg]);
 
+  // Refresh products when page becomes visible again (e.g., after adjusting parts on Parts page)
+  // This ensures product costs are updated after part cost changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && currentOrg && !loading) {
+        loadData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [currentOrg, loading]);
+
   const loadData = async () => {
     if (!currentOrg) return;
     setLoading(true);

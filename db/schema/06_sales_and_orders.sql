@@ -34,6 +34,7 @@ AS $$
 DECLARE
   v_txn_id UUID;
   v_org_id UUID;
+  v_unit_cost_at_sale NUMERIC(10,2);
 BEGIN
   -- Validate inputs
   IF p_quantity IS NULL OR p_quantity <= 0 THEN
@@ -71,9 +72,23 @@ BEGIN
     RAISE EXCEPTION 'Insufficient product inventory for product % (qty=%)', p_product_id, p_quantity;
   END IF;
 
-  -- Insert product transaction with sale type and unit price
-  INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, notes)
-  VALUES (v_org_id, 'sale', p_product_id, p_quantity, p_unit_price, COALESCE(p_notes, 'sale'))
+  -- Calculate unit cost at sale time using the same FIFO logic as product cost calculation
+  -- Use the calculate_product_total_cost function to get current total cost
+  -- This uses FIFO logic from most recent purchases
+  SELECT COALESCE(calculate_product_total_cost(p_product_id), 0) INTO v_unit_cost_at_sale;
+  
+  -- Convert total cost to unit cost (divide by 1 unit, not by sale quantity)
+  -- The function returns total cost for 1 unit of product based on recipe
+  -- If product has no recipe or cost calculation fails, use product's total_cost
+  IF v_unit_cost_at_sale IS NULL OR v_unit_cost_at_sale = 0 THEN
+    SELECT COALESCE(total_cost, 0) INTO v_unit_cost_at_sale
+    FROM products
+    WHERE product_id = p_product_id;
+  END IF;
+
+  -- Insert product transaction with sale type, unit price, and unit cost at sale
+  INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, unit_cost_at_sale, notes)
+  VALUES (v_org_id, 'sale', p_product_id, p_quantity, p_unit_price, v_unit_cost_at_sale, COALESCE(p_notes, 'sale'))
   RETURNING txn_id INTO v_txn_id;
 
   -- Decrease product quantity
@@ -91,28 +106,21 @@ $$;
 -- View: product_profit_summary
 -- Shows revenue, cost, and profit per product
 -- Revenue from product_transactions (txn_type='sale')
--- Cost is calculated from recipe (parts cost)
+-- Cost uses unit_cost_at_sale from transactions (historical cost at time of sale)
+-- This ensures profit calculations are not affected by changing market costs
 ---------------------------------------------------------------------
 CREATE OR REPLACE VIEW product_profit_summary AS
 WITH sales_summary AS (
   SELECT
     product_id,
     SUM(qty * unit_price_for_sale) AS total_revenue,
+    SUM(qty * unit_cost_at_sale) AS total_cost,
     SUM(qty) AS total_sold,
-    AVG(unit_price_for_sale) AS avg_selling_price
+    AVG(unit_price_for_sale) AS avg_selling_price,
+    AVG(unit_cost_at_sale) AS avg_cost_per_unit
   FROM product_transactions
   WHERE txn_type = 'sale'
   GROUP BY product_id
-),
-product_costs AS (
-  SELECT
-    rl.product_id,
-    SUM(rl.quantity * pa.unit_cost) AS cost_per_unit
-  FROM recipe_lines rl
-  JOIN parts pa ON pa.part_id = rl.part_id
-  JOIN products p ON p.product_id = rl.product_id
-  WHERE pa.org_id = p.org_id
-  GROUP BY rl.product_id
 )
 SELECT
   p.product_id,
@@ -121,12 +129,11 @@ SELECT
   COALESCE(ss.total_revenue, 0) AS total_revenue,
   COALESCE(ss.total_sold, 0) AS total_sold,
   COALESCE(ss.avg_selling_price, 0) AS avg_selling_price,
-  COALESCE(pc.cost_per_unit, 0) AS cost_per_unit,
-  COALESCE(pc.cost_per_unit * ss.total_sold, 0) AS total_cost,
-  COALESCE(ss.total_revenue, 0) - COALESCE(pc.cost_per_unit * ss.total_sold, 0) AS total_profit
+  COALESCE(ss.avg_cost_per_unit, 0) AS cost_per_unit,
+  COALESCE(ss.total_cost, 0) AS total_cost,
+  COALESCE(ss.total_revenue, 0) - COALESCE(ss.total_cost, 0) AS total_profit
 FROM products p
-LEFT JOIN sales_summary ss ON ss.product_id = p.product_id
-LEFT JOIN product_costs pc ON pc.product_id = p.product_id;
+LEFT JOIN sales_summary ss ON ss.product_id = p.product_id;
 
 COMMIT;
 

@@ -52,6 +52,7 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recipeLines, setRecipeLines] = useState<Array<{ part_id: string; quantity: string }>>([]);
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
+  const [fifoCosts, setFifoCosts] = useState<Record<string, number>>({}); // part_id -> fifo_unit_cost
   const [loadingParts, setLoadingParts] = useState(false);
   const [partTypes, setPartTypes] = useState<PartType[]>([]);
   const [partSubtypes, setPartSubtypes] = useState<PartSubtype[]>([]);
@@ -497,15 +498,53 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
     return partSubtypes.filter((st) => st.type_id === typeId);
   };
 
+  // Fetch FIFO costs for all recipe lines
+  useEffect(() => {
+    const fetchFIFOCosts = async () => {
+      const costs: Record<string, number> = {};
+      for (const line of recipeLines) {
+        if (line.part_id && line.quantity) {
+          try {
+            const quantity = parseFloat(line.quantity) || 0;
+            if (quantity > 0) {
+              const response = await partsApi.getFIFOCost(line.part_id, quantity);
+              costs[line.part_id] = parseFloat(response.data.fifo_unit_cost) || 0;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch FIFO cost for part ${line.part_id}:`, error);
+            // Fallback to historical average
+            const part = availableParts.find((p) => p.part_id === line.part_id);
+            if (part && part.unit_cost) {
+              costs[line.part_id] = parseFloat(part.unit_cost) || 0;
+            }
+          }
+        }
+      }
+      setFifoCosts(costs);
+    };
+
+    if (recipeLines.length > 0 && availableParts.length > 0) {
+      fetchFIFOCosts();
+    } else {
+      setFifoCosts({});
+    }
+  }, [recipeLines, availableParts]);
+
   const calculateRecipeTotalCost = () => {
     let total = 0;
     recipeLines.forEach((line) => {
       if (line.part_id && line.quantity) {
-        const part = availableParts.find((p) => p.part_id === line.part_id);
-        if (part && part.unit_cost) {
-          const quantity = parseFloat(line.quantity) || 0;
-          const unitCost = parseFloat(part.unit_cost) || 0;
-          total += quantity * unitCost;
+        const quantity = parseFloat(line.quantity) || 0;
+        // Use FIFO cost if available, otherwise fallback to historical average
+        const fifoCost = fifoCosts[line.part_id];
+        if (fifoCost !== undefined) {
+          total += quantity * fifoCost;
+        } else {
+          // Fallback to historical average while loading
+          const part = availableParts.find((p) => p.part_id === line.part_id);
+          if (part && part.unit_cost) {
+            total += quantity * parseFloat(part.unit_cost);
+          }
         }
       }
     });
@@ -904,14 +943,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">Recipe</label>
-              {calculateRecipeTotalCost() > 0 && (
-                <div className="text-sm">
-                  <span className="text-gray-600">Calculated Total Cost: </span>
-                  <span className="font-semibold text-gray-900">
-                    ${calculateRecipeTotalCost().toFixed(2)} {currentOrg?.main_currency || 'USD'}
-                  </span>
-                </div>
-              )}
             </div>
             <div className="space-y-2">
               {recipeLines.map((line, index) => {
@@ -931,11 +962,23 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
                           <div className="text-sm text-gray-600">
                             Quantity: {line.quantity} {part.unit ? `(${part.unit})` : ''}
                           </div>
-                          {part.unit_cost && (
-                            <div className="text-sm text-gray-500">
-                              Cost: ${(parseFloat(part.unit_cost) * parseFloat(line.quantity || '0')).toFixed(2)}
-                            </div>
-                          )}
+                          {(() => {
+                            const quantity = parseFloat(line.quantity || '0');
+                            const fifoCost = fifoCosts[line.part_id];
+                            const cost = fifoCost !== undefined 
+                              ? quantity * fifoCost 
+                              : (part.unit_cost ? quantity * parseFloat(part.unit_cost) : 0);
+                            return (
+                              <div className="text-sm text-gray-500">
+                                Cost: ${cost.toFixed(2)}
+                                {fifoCost !== undefined && fifoCost !== parseFloat(part.unit_cost || '0') && (
+                                  <span className="text-xs text-gray-400 ml-1">
+                                    (FIFO, avg: ${parseFloat(part.unit_cost || '0').toFixed(2)})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -1154,14 +1197,19 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
               
               {/* Total Cost Display */}
               {recipeLines.length > 0 && (
-                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Total Recipe Cost:</span>
-                    <span className="text-lg font-semibold text-gray-900">
-                      ${calculateRecipeTotalCost().toFixed(2)}
-                    </span>
+                <>
+                  <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">Total Recipe Cost:</span>
+                      <span className="text-lg font-semibold text-gray-900">
+                        ${calculateRecipeTotalCost().toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                  <div className="text-xs text-gray-500 mt-2 italic">
+                    * Calculated using FIFO cost (most recent purchases) for each part, not historical average.
+                  </div>
+                </>
               )}
             </div>
           </div>

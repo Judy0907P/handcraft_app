@@ -34,6 +34,43 @@ def get_part(part_id: UUID, db: Session = Depends(get_db)):
     return part
 
 
+@router.get("/{part_id}/fifo-cost", response_model=schemas.PartFIFOCostResponse)
+def get_part_fifo_cost(
+    part_id: UUID,
+    quantity: float = Query(..., gt=0, description="Quantity needed to calculate FIFO cost"),
+    db: Session = Depends(get_db)
+):
+    """Get FIFO (most recent purchases) unit cost for a part given a quantity"""
+    from sqlalchemy import text
+    from decimal import Decimal
+    
+    # Verify part exists
+    part = services.get_part(db, part_id)
+    if not part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Part not found"
+        )
+    
+    # Use the database function to calculate FIFO cost
+    result = db.execute(
+        text("SELECT calculate_part_unit_cost_from_recent_purchases(:part_id, :quantity)"),
+        {"part_id": str(part_id), "quantity": str(quantity)}
+    )
+    fifo_cost = result.scalar()
+    
+    if fifo_cost is None:
+        # Fallback to current unit_cost
+        fifo_cost = part.unit_cost
+    
+    return {
+        "part_id": part_id,
+        "quantity": Decimal(str(quantity)),
+        "fifo_unit_cost": Decimal(str(fifo_cost)),
+        "historical_average_cost": part.unit_cost
+    }
+
+
 @router.get("/org/{org_id}", response_model=List[schemas.PartResponse])
 def get_parts_by_org(
     org_id: UUID,
@@ -137,6 +174,46 @@ def delete_part_image(part_id: UUID, db: Session = Depends(get_db)):
         db.refresh(part)
     
     return part
+
+
+@router.post("/{part_id}/inventory", response_model=schemas.PartInventoryAdjustmentResponse)
+def adjust_part_inventory(
+    part_id: UUID,
+    adjustment: schemas.PartInventoryAdjustmentRequest,
+    db: Session = Depends(get_db)
+):
+    """Adjust part inventory (purchase or loss).
+    - purchase: qty must be positive (increases inventory), requires cost
+    - loss: qty must be positive (decreases inventory), no cost needed
+    """
+    if adjustment.part_id != part_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Part ID in URL must match part_id in request body"
+        )
+    
+    try:
+        result = services.adjust_part_inventory(
+            db,
+            part_id=part_id,
+            txn_type=adjustment.txn_type,
+            qty=adjustment.qty,
+            unit_cost=adjustment.unit_cost,
+            total_cost=adjustment.total_cost,
+            cost_type=adjustment.cost_type,
+            notes=adjustment.notes
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to adjust inventory: {str(e)}"
+        )
 
 
 @router.delete("/{part_id}", status_code=status.HTTP_204_NO_CONTENT)

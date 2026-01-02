@@ -11,11 +11,15 @@ from app.schemas import PartCreate, ProductCreate, SaleCreate, BuildProductReque
 
 def create_part(db: Session, part: PartCreate) -> Part:
     """Create a new part"""
+    # Use provided values or defaults
+    stock = part.stock if part.stock is not None else 0
+    unit_cost = part.unit_cost if part.unit_cost is not None else Decimal('0')
+    
     db_part = Part(
         org_id=part.org_id,
         name=part.name,
-        stock=part.stock,
-        unit_cost=part.unit_cost,
+        stock=stock,
+        unit_cost=unit_cost,
         unit=part.unit,
         subtype_id=part.subtype_id,
         specs=part.specs,
@@ -42,10 +46,13 @@ def get_parts_by_org(db: Session, org_id: UUID, skip: int = 0, limit: int = 100)
 
 
 def update_part(db: Session, part_id: UUID, part_update: dict) -> Part:
-    """Update a part"""
+    """Update a part (stock and unit_cost cannot be updated directly - use inventory adjustment)"""
     db_part = db.query(Part).filter(Part.part_id == part_id).first()
     if not db_part:
         return None
+    
+    # Remove stock and unit_cost from update dict if present (they should not be updated directly)
+    part_update = {k: v for k, v in part_update.items() if k not in ['stock', 'unit_cost']}
     
     for key, value in part_update.items():
         if value is not None:
@@ -211,6 +218,18 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
     if new_quantity < 0:
         raise ValueError(f"Insufficient inventory. Current: {product.quantity}, Loss: {qty}")
     
+    # Calculate unit cost at loss time (same as sale - use current product cost)
+    # Use the calculate_product_total_cost function via SQL to get current cost
+    from sqlalchemy import text
+    cost_result = db.execute(
+        text("SELECT calculate_product_total_cost(:product_id)"),
+        {"product_id": str(product_id)}
+    )
+    unit_cost_at_loss = cost_result.scalar()
+    if unit_cost_at_loss is None or unit_cost_at_loss == 0:
+        # Fallback to product's total_cost if calculation fails
+        unit_cost_at_loss = product.total_cost if product.total_cost else Decimal('0')
+    
     # Create product transaction (unit_price_for_sale is 0 for loss)
     transaction = ProductTransaction(
         org_id=product.org_id,
@@ -218,6 +237,7 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
         product_id=product_id,
         qty=qty,  # Store as int
         unit_price_for_sale=Decimal('0'),  # Loss has no sale price
+        unit_cost_at_sale=Decimal(str(unit_cost_at_loss)),  # Store cost at time of loss
         notes=notes
     )
     db.add(transaction)
@@ -237,5 +257,146 @@ def adjust_product_inventory(db: Session, product_id: UUID, txn_type: str, qty: 
         "qty": qty,
         "new_product_quantity": product.quantity,
         "message": f"Successfully recorded loss: {qty} units. New quantity: {product.quantity}"
+    }
+
+
+def calculate_part_average_cost(db: Session, part_id: UUID) -> Decimal:
+    """
+    Calculate the weighted average cost of available stock for a part.
+    Only considers purchase transactions (not loss or build_product).
+    Uses weighted average: sum of (qty * unit_price) / sum(qty) for all purchase transactions.
+    
+    Note: This calculates the average purchase price across all purchases.
+    For a more accurate cost that accounts for consumed stock, we'd need to track
+    remaining stock per transaction, but for simplicity we use the purchase-weighted average.
+    """
+    from app.models import PartTransaction
+    
+    # Get all purchase transactions for this part
+    purchase_transactions = db.query(PartTransaction).filter(
+        PartTransaction.part_id == part_id,
+        PartTransaction.txn_type == 'purchase'
+    ).all()
+    
+    if not purchase_transactions:
+        # If no purchase transactions, return current unit_cost or 0
+        part = db.query(Part).filter(Part.part_id == part_id).first()
+        return part.unit_cost if part else Decimal('0')
+    
+    # Calculate weighted average: sum(qty * unit_price) / sum(qty)
+    total_cost = Decimal('0')
+    total_qty = 0
+    
+    for txn in purchase_transactions:
+        # qty is stored as positive for purchase transactions
+        qty = abs(txn.qty)  # Ensure positive
+        total_cost += Decimal(str(qty)) * Decimal(str(txn.unit_price_for_purchase))
+        total_qty += qty
+    
+    if total_qty == 0:
+        part = db.query(Part).filter(Part.part_id == part_id).first()
+        return part.unit_cost if part else Decimal('0')
+    
+    average_cost = total_cost / Decimal(str(total_qty))
+    return average_cost
+
+
+def adjust_part_inventory(
+    db: Session, 
+    part_id: UUID, 
+    txn_type: str, 
+    qty: int, 
+    unit_cost: Optional[Decimal] = None,
+    total_cost: Optional[Decimal] = None,
+    cost_type: str = 'unit',
+    notes: Optional[str] = None
+) -> dict:
+    """
+    Adjust part inventory for purchase or loss transactions.
+    
+    Transaction type rules:
+    - purchase: qty must be positive (increases inventory), requires cost
+    - loss: qty must be positive (decreases inventory), no cost needed
+    
+    This function:
+    1. Validates the part exists
+    2. Creates a part transaction record
+    3. Updates part stock
+    4. Updates part unit_cost to weighted average cost from purchase transactions
+    """
+    from app.models import Part, PartTransaction
+    
+    # Validate transaction type
+    valid_types = ['purchase', 'loss']
+    if txn_type not in valid_types:
+        raise ValueError(f"Invalid txn_type. Must be one of: {', '.join(valid_types)}")
+    
+    # Validate quantity
+    if qty <= 0:
+        raise ValueError("Quantity must be greater than 0 (positive)")
+    
+    # Get part
+    part = db.query(Part).filter(Part.part_id == part_id).first()
+    if not part:
+        raise ValueError(f"Part {part_id} not found")
+    
+    # For purchase, validate and calculate unit cost
+    unit_price_for_purchase = Decimal('0')
+    if txn_type == 'purchase':
+        if cost_type == 'unit' and unit_cost is not None:
+            unit_price_for_purchase = Decimal(str(unit_cost))
+        elif cost_type == 'total' and total_cost is not None:
+            if qty == 0:
+                raise ValueError("Cannot calculate unit cost from total cost when quantity is 0")
+            unit_price_for_purchase = Decimal(str(total_cost)) / Decimal(str(qty))
+        else:
+            raise ValueError("Purchase transactions require either unit_cost or total_cost")
+    
+    # Calculate new stock
+    if txn_type == 'purchase':
+        new_stock = part.stock + qty  # Purchase increases inventory
+    else:  # loss
+        new_stock = part.stock - qty  # Loss decreases inventory
+        if new_stock < 0:
+            raise ValueError(f"Insufficient inventory. Current: {part.stock}, Loss: {qty}")
+    
+    # Create part transaction
+    # Note: According to schema, qty is INT and for purchase it's positive, for loss/build_product it's negative
+    transaction = PartTransaction(
+        part_id=part_id,
+        txn_type=txn_type,
+        qty=qty if txn_type == 'purchase' else -qty,  # Store as positive for purchase, negative for loss
+        unit_price_for_purchase=unit_price_for_purchase,
+        product_txn_id=None,  # Only set for build_product transactions
+        notes=notes
+    )
+    db.add(transaction)
+    db.flush()  # Get transaction ID
+    
+    # Update part stock
+    part.stock = new_stock
+    
+    # Update part unit_cost to weighted average from purchase transactions
+    # Always recalculate after purchase, and after loss if stock > 0
+    if txn_type == 'purchase' or (txn_type == 'loss' and new_stock > 0):
+        # Recalculate average cost from all purchase transactions
+        average_cost = calculate_part_average_cost(db, part_id)
+        part.unit_cost = average_cost
+    elif txn_type == 'loss' and new_stock == 0:
+        # If stock reaches 0, keep the current unit_cost (it will be used for next purchase)
+        pass
+    
+    db.commit()
+    db.refresh(transaction)
+    db.refresh(part)
+    
+    return {
+        "transaction_id": transaction.txn_id,
+        "part_id": part_id,
+        "txn_type": txn_type,
+        "qty": qty,
+        "new_stock": part.stock,
+        "new_unit_cost": part.unit_cost,
+        "message": f"Successfully recorded {txn_type}: {qty} units. New stock: {part.stock}, Average cost: ${part.unit_cost:.2f}"
     }
 

@@ -39,7 +39,7 @@ class UserResponse(BaseModel):
 class PartBase(BaseModel):
     name: str
     stock: int = Field(ge=0, default=0)
-    unit_cost: Decimal = Field(ge=0)
+    unit_cost: Decimal = Field(ge=0, default=0)
     unit: Optional[str] = None
     subtype_id: Optional[UUID] = None
     specs: Optional[str] = None
@@ -52,12 +52,13 @@ class PartBase(BaseModel):
 
 class PartCreate(PartBase):
     org_id: UUID
+    # stock and unit_cost are optional for new parts (default to 0)
+    # Users should use inventory adjustment to add stock after creation
 
 
 class PartUpdate(BaseModel):
     name: Optional[str] = None
-    stock: Optional[int] = Field(None, ge=0)
-    unit_cost: Optional[Decimal] = Field(None, ge=0)
+    # stock and unit_cost are not editable directly - use inventory adjustment instead
     unit: Optional[str] = None
     subtype_id: Optional[UUID] = None
     specs: Optional[str] = None
@@ -179,6 +180,33 @@ class ProductInventoryAdjustmentResponse(BaseModel):
     message: str
 
 
+class PartInventoryAdjustmentRequest(BaseModel):
+    part_id: UUID
+    txn_type: str = Field(..., description="Transaction type: 'purchase' (increases inventory) or 'loss' (decreases inventory)")
+    qty: int = Field(..., gt=0, description="Quantity to adjust (must be positive)")
+    unit_cost: Optional[Decimal] = Field(None, ge=0, description="Unit cost (required for purchase if cost_type is 'unit')")
+    total_cost: Optional[Decimal] = Field(None, ge=0, description="Total cost (required for purchase if cost_type is 'total')")
+    cost_type: str = Field('unit', description="Cost type: 'unit' or 'total' (only used for purchase)")
+    notes: Optional[str] = None
+
+
+class PartInventoryAdjustmentResponse(BaseModel):
+    transaction_id: UUID
+    part_id: UUID
+    txn_type: str
+    qty: int
+    new_stock: int
+    new_unit_cost: Decimal
+    message: str
+
+
+class PartFIFOCostResponse(BaseModel):
+    part_id: UUID
+    quantity: Decimal
+    fifo_unit_cost: Decimal
+    historical_average_cost: Decimal
+
+
 # Sale Schemas (now using ProductTransaction)
 class SaleCreate(BaseModel):
     product_id: UUID
@@ -194,7 +222,10 @@ class SaleResponse(BaseModel):
     txn_type: str
     qty: int
     unit_price_for_sale: Decimal
+    unit_cost_at_sale: Decimal
     total_revenue: Decimal  # Calculated as qty * unit_price_for_sale
+    total_cost: Decimal  # Calculated as qty * unit_cost_at_sale
+    profit: Decimal  # Calculated as total_revenue - total_cost
     notes: Optional[str] = None
     created_at: datetime
     
@@ -214,6 +245,10 @@ class SaleResponse(BaseModel):
         else:
             created_at = txn.created_at
         
+        total_revenue = txn.qty * txn.unit_price_for_sale
+        total_cost = txn.qty * txn.unit_cost_at_sale
+        profit = total_revenue - total_cost
+        
         return cls(
             txn_id=txn.txn_id,
             org_id=txn.org_id,
@@ -221,7 +256,10 @@ class SaleResponse(BaseModel):
             txn_type=txn.txn_type,
             qty=txn.qty,
             unit_price_for_sale=txn.unit_price_for_sale,
-            total_revenue=txn.qty * txn.unit_price_for_sale,
+            unit_cost_at_sale=txn.unit_cost_at_sale,
+            total_revenue=total_revenue,
+            total_cost=total_cost,
+            profit=profit,
             notes=txn.notes,
             created_at=created_at
         )

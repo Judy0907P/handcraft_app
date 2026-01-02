@@ -97,8 +97,8 @@ export const partsApi = {
   create: (data: {
     org_id: string;
     name: string;
-    stock: number;
-    unit_cost: string;
+    stock?: number;
+    unit_cost?: string;
     unit?: string;
     subtype_id?: string;
   }) => api.post<Part>('/parts/', data),
@@ -114,6 +114,16 @@ export const partsApi = {
     });
   },
   deleteImage: (partId: string) => api.delete<Part>(`/parts/${partId}/image`),
+  getFIFOCost: (partId: string, quantity: number) => api.get<{ part_id: string; quantity: string; fifo_unit_cost: string; historical_average_cost: string }>(`/parts/${partId}/fifo-cost`, { params: { quantity } }),
+  adjustInventory: (partId: string, data: {
+    part_id: string;
+    txn_type: 'purchase' | 'loss';
+    qty: number;
+    unit_cost?: string;
+    total_cost?: string;
+    cost_type?: 'unit' | 'total';
+    notes?: string;
+  }) => api.post<{ transaction_id: string; part_id: string; txn_type: string; qty: number; new_stock: number; new_unit_cost: string; message: string }>(`/parts/${partId}/inventory`, data),
 };
 
 // Product Types

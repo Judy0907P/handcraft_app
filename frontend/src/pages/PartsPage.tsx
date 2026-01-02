@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
 import { partsApi, partTypesApi, partSubtypesApi } from '../services/api';
 import { Part, PartType, PartSubtype, SortOption, SortDirection } from '../types';
-import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, GripVertical, Package } from 'lucide-react';
 import PartModal from '../components/parts/PartModal';
 import PartTypeModal from '../components/parts/PartTypeModal';
 import PartSubtypeModal from '../components/parts/PartSubtypeModal';
+import PartInventoryDialog from '../components/parts/PartInventoryDialog';
 
 const PartsPage = () => {
   const { currentOrg } = useOrg();
@@ -22,6 +23,8 @@ const PartsPage = () => {
   const [selectedType, setSelectedType] = useState<PartType | null>(null);
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [showInventoryDialog, setShowInventoryDialog] = useState(false);
+  const [selectedPartForInventory, setSelectedPartForInventory] = useState<Part | null>(null);
 
   useEffect(() => {
     if (currentOrg) {
@@ -130,6 +133,15 @@ const PartsPage = () => {
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Failed to delete subtype');
     }
+  };
+
+  const handleInventoryChange = (part: Part) => {
+    setSelectedPartForInventory(part);
+    setShowInventoryDialog(true);
+  };
+
+  const handleInventoryChangeSuccess = async () => {
+    await loadData(); // Reload parts to get updated stock and cost
   };
 
   if (loading) {
@@ -293,6 +305,7 @@ const PartsPage = () => {
                                   setShowPartModal(true);
                                 }}
                                 onDelete={() => handleDeletePart(part.part_id)}
+                                onInventoryChange={() => handleInventoryChange(part)}
                               />
                             ))}
                           </div>
@@ -320,6 +333,7 @@ const PartsPage = () => {
                     setShowPartModal(true);
                   }}
                   onDelete={() => handleDeletePart(part.part_id)}
+                  onInventoryChange={() => handleInventoryChange(part)}
                 />
               ))}
             </div>
@@ -362,6 +376,18 @@ const PartsPage = () => {
           onSave={loadData}
         />
       )}
+
+      {showInventoryDialog && selectedPartForInventory && (
+        <PartInventoryDialog
+          partId={selectedPartForInventory.part_id}
+          currentStock={selectedPartForInventory.stock}
+          onClose={() => {
+            setShowInventoryDialog(false);
+            setSelectedPartForInventory(null);
+          }}
+          onSuccess={handleInventoryChangeSuccess}
+        />
+      )}
     </div>
   );
 };
@@ -370,10 +396,12 @@ const PartCard = ({
   part,
   onEdit,
   onDelete,
+  onInventoryChange,
 }: {
   part: Part;
   onEdit: () => void;
   onDelete: () => void;
+  onInventoryChange: () => void;
 }) => {
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -384,7 +412,10 @@ const PartCard = ({
           {part.alert_stock > 0 && (
             <p className="text-sm text-orange-600">Alert at: {part.alert_stock} {part.unit || ''}</p>
           )}
-          <p className="text-sm text-gray-600">Cost: ${parseFloat(part.unit_cost).toFixed(2)}</p>
+          <p className="text-sm text-gray-600">
+            Historical Avg Cost: ${parseFloat(part.unit_cost).toFixed(2)}
+            <span className="text-xs text-gray-400 ml-1">(all purchases)</span>
+          </p>
           {part.specs && <p className="text-sm text-gray-500">Specs: {part.specs}</p>}
           {part.color && <p className="text-sm text-gray-500">Color: {part.color}</p>}
           {part.status && part.status.length > 0 && (
@@ -402,14 +433,23 @@ const PartCard = ({
         </div>
         <div className="flex gap-1">
           <button
+            onClick={onInventoryChange}
+            className="p-1 text-gray-600 hover:text-green-600 transition-colors"
+            title="Adjust inventory"
+          >
+            <Package className="w-4 h-4" />
+          </button>
+          <button
             onClick={onEdit}
             className="p-1 text-gray-600 hover:text-primary-600 transition-colors"
+            title="Edit part"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
             className="p-1 text-gray-600 hover:text-red-600 transition-colors"
+            title="Delete part"
           >
             <Trash2 className="w-4 h-4" />
           </button>

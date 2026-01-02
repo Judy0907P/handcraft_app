@@ -16,11 +16,6 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
   const { currentOrg } = useOrg();
   const [formData, setFormData] = useState({
     name: '',
-    stock: 0,
-    unit_cost: '',
-    total_cost: '',
-    cost_type: 'unit' as 'unit' | 'total',
-    cost_currency: '',
     unit: '',
     type_id: '',
     subtype_id: '',
@@ -32,8 +27,6 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     notes: '',
   });
   
-  // Exchange rate from organization settings: 1 main_currency = exchange_rate additional_currency
-  const EXCHANGE_RATE = currentOrg?.exchange_rate ? parseFloat(currentOrg.exchange_rate) : 1.0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -76,11 +69,6 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
       
       setFormData({
         name: part.name,
-        stock: part.stock,
-        unit_cost: part.unit_cost,
-        total_cost: '',
-        cost_type: 'unit',
-        cost_currency: currentOrg?.main_currency || 'USD', // Parts are stored in main currency, default to main for display
         unit: part.unit || '',
         type_id: partType?.type_id || '',
         subtype_id: part.subtype_id || '',
@@ -103,11 +91,6 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
       // Reset form when creating a new part
       setFormData({
         name: '',
-        stock: 0,
-        unit_cost: '',
-        total_cost: '',
-        cost_type: 'unit',
-        cost_currency: currentOrg?.main_currency || 'USD',
         unit: '',
         type_id: '',
         subtype_id: '',
@@ -303,54 +286,11 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     if (!currentOrg) return;
 
     setError('');
-    
-    // Validate cost fields
-    if (formData.cost_type === 'unit' && !formData.unit_cost) {
-      setError('Please enter unit cost or switch to total cost');
-      return;
-    }
-    if (formData.cost_type === 'total' && !formData.total_cost) {
-      setError('Please enter total cost or switch to unit cost');
-      return;
-    }
-    if (formData.cost_type === 'unit' && formData.total_cost) {
-      setError('Please enter either unit cost OR total cost, not both');
-      return;
-    }
-    if (formData.cost_type === 'total' && formData.unit_cost) {
-      setError('Please enter either unit cost OR total cost, not both');
-      return;
-    }
-
-    // Calculate unit_cost from total_cost if needed and convert to main currency
-    const mainCurrency = currentOrg?.main_currency || 'USD';
-    const additionalCurrency = currentOrg?.additional_currency;
-    let unit_cost = formData.unit_cost;
-    
-    if (formData.cost_type === 'total' && formData.total_cost && formData.stock > 0) {
-      let totalCostMain = parseFloat(formData.total_cost);
-      // Convert to main currency if input is in additional currency
-      if (formData.cost_currency === additionalCurrency && additionalCurrency) {
-        totalCostMain = totalCostMain / EXCHANGE_RATE;
-      }
-      unit_cost = (totalCostMain / formData.stock).toFixed(2);
-    } else if (formData.cost_type === 'total' && formData.total_cost) {
-      setError('Stock must be greater than 0 to calculate unit cost from total cost');
-      return;
-    } else if (formData.cost_type === 'unit' && formData.unit_cost) {
-      // Convert unit cost to main currency if input is in additional currency
-      if (formData.cost_currency === additionalCurrency && additionalCurrency) {
-        unit_cost = (parseFloat(formData.unit_cost) / EXCHANGE_RATE).toFixed(2);
-      }
-    }
-
     setLoading(true);
 
     try {
       const data = {
         name: formData.name,
-        stock: formData.stock,
-        unit_cost: unit_cost,
         unit: formData.unit || undefined,
         org_id: currentOrg.org_id,
         subtype_id: formData.subtype_id || undefined,
@@ -422,130 +362,25 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stock *</label>
-            <input
-              type="number"
-              value={formData.stock === 0 ? '' : formData.stock}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Handle empty input
-                if (value === '') {
-                  setFormData({ ...formData, stock: 0 });
-                  return;
-                }
-                // Remove leading zeros and parse
-                const numValue = parseInt(value.replace(/^0+/, '') || '0', 10);
-                setFormData({ ...formData, stock: isNaN(numValue) ? 0 : numValue });
-              }}
-              required
-              min="0"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cost Information *</label>
-            <div className="flex gap-4 mb-3">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="cost_type"
-                  value="unit"
-                  checked={formData.cost_type === 'unit'}
-                  onChange={(e) => setFormData({ ...formData, cost_type: 'unit', total_cost: '' })}
-                  className="mr-2"
-                />
-                <span>Unit Cost</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="cost_type"
-                  value="total"
-                  checked={formData.cost_type === 'total'}
-                  onChange={(e) => setFormData({ ...formData, cost_type: 'total', unit_cost: '' })}
-                  className="mr-2"
-                />
-                <span>Total Cost</span>
-              </label>
-            </div>
-            {currentOrg?.additional_currency && (
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="cost_currency"
-                      value={currentOrg.main_currency}
-                      checked={formData.cost_currency === currentOrg.main_currency}
-                      onChange={(e) => setFormData({ ...formData, cost_currency: currentOrg.main_currency })}
-                      className="mr-2"
-                    />
-                    <span>{currentOrg.main_currency}</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="cost_currency"
-                      value={currentOrg.additional_currency}
-                      checked={formData.cost_currency === currentOrg.additional_currency}
-                      onChange={(e) => setFormData({ ...formData, cost_currency: currentOrg.additional_currency })}
-                      className="mr-2"
-                    />
-                    <span>{currentOrg.additional_currency}</span>
-                  </label>
-                </div>
+          {part && (
+            <>
+              <div className="p-3 bg-gray-50 rounded-md">
+                <p className="text-sm text-gray-600">
+                  Stock: <span className="font-semibold text-gray-900">{part.stock}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Historical Average Cost: <span className="font-semibold text-gray-900">${parseFloat(part.unit_cost).toFixed(2)}</span>
+                  <span className="text-xs text-gray-400 ml-1">(weighted avg of all purchases)</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Use the "Inventory Adjustment" button on the part card to adjust stock and cost.
+                </p>
+                <p className="text-xs text-gray-500 mt-1 italic">
+                  Note: Product recipes use FIFO cost (most recent purchases), which may differ from this historical average.
+                </p>
               </div>
-            )}
-            {formData.cost_type === 'unit' ? (
-              <div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.unit_cost}
-                  onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value, total_cost: '' })}
-                  required={formData.cost_type === 'unit'}
-                  min="0"
-                  placeholder={`Enter unit cost in ${formData.cost_currency}`}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {formData.unit_cost && formData.cost_currency === currentOrg?.additional_currency && currentOrg?.additional_currency && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    ≈ {(parseFloat(formData.unit_cost) / EXCHANGE_RATE).toFixed(2)} {currentOrg.main_currency}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.total_cost}
-                  onChange={(e) => setFormData({ ...formData, total_cost: e.target.value, unit_cost: '' })}
-                  required={formData.cost_type === 'total'}
-                  min="0"
-                  placeholder={`Enter total cost in ${formData.cost_currency}`}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {formData.total_cost && formData.stock > 0 && currentOrg && (
-                  <div className="mt-1 text-xs text-gray-500 space-y-1">
-                    <p>
-                      Total: {formData.cost_currency === currentOrg.additional_currency && currentOrg.additional_currency
-                        ? `${parseFloat(formData.total_cost).toFixed(2)} ${currentOrg.additional_currency} ≈ ${(parseFloat(formData.total_cost) / EXCHANGE_RATE).toFixed(2)} ${currentOrg.main_currency}`
-                        : `${parseFloat(formData.total_cost).toFixed(2)} ${currentOrg.main_currency}`}
-                    </p>
-                    <p>
-                      Unit cost: {formData.cost_currency === currentOrg.additional_currency && currentOrg.additional_currency
-                        ? `${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} ${currentOrg.additional_currency} ≈ ${((parseFloat(formData.total_cost) / EXCHANGE_RATE) / formData.stock).toFixed(2)} ${currentOrg.main_currency}`
-                        : `${(parseFloat(formData.total_cost) / formData.stock).toFixed(2)} ${currentOrg.main_currency}`}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>

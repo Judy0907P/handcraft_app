@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS product_transactions (
   qty INT NOT NULL,
 
   unit_price_for_sale NUMERIC(10,2) NOT NULL CHECK (unit_price_for_sale >= 0),
+  unit_cost_at_sale NUMERIC(10,2) NOT NULL CHECK (unit_cost_at_sale >= 0),
 
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -136,8 +137,9 @@ BEGIN
   END IF;
 
   -- 4) Insert product transaction header
-  INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, notes)
-  VALUES (v_org_id, 'build_product', p_product_id, CEIL(p_build_qty)::INT, 0, 'auto build')
+  -- For build_product, unit_cost_at_sale is 0 (no sale cost, just inventory increase)
+  INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, unit_cost_at_sale, notes)
+  VALUES (v_org_id, 'build_product', p_product_id, CEIL(p_build_qty)::INT, 0, 0, 'auto build')
   RETURNING txn_id INTO v_txn_id;
 
   -- 5) Insert part transactions (each part consumption)
