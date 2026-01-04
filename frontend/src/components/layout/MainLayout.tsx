@@ -1,8 +1,9 @@
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { useCart } from '../../contexts/CartContext';
-import { Home, Package, ShoppingBag, ShoppingCart, FileText, DollarSign, Settings, LogOut, Building2 } from 'lucide-react';
+import { Home, Package, ShoppingBag, ShoppingCart, FileText, DollarSign, Settings, LogOut, Building2, ChevronDown } from 'lucide-react';
 
 const MainLayout = () => {
   const { logout } = useAuth();
@@ -10,6 +11,8 @@ const MainLayout = () => {
   const { getItemCount } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
@@ -39,6 +42,31 @@ const MainLayout = () => {
     }
     return location.pathname.startsWith(path);
   };
+
+  // Get the current active nav item
+  const activeNavItem = navItems.find(item => isActive(item.path)) || navItems[0];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // Close dropdown when navigating
+  useEffect(() => {
+    setIsDropdownOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,7 +107,8 @@ const MainLayout = () => {
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1">
+          {/* Desktop Navigation - hidden on mobile */}
+          <div className="hidden md:flex space-x-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -104,6 +133,63 @@ const MainLayout = () => {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Mobile Navigation - dropdown style */}
+          <div className="md:hidden relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium border-b-2 border-primary-500 text-primary-600"
+            >
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const ActiveIcon = activeNavItem.icon;
+                  return (
+                    <>
+                      <ActiveIcon className="w-5 h-5" />
+                      <span>{activeNavItem.label}</span>
+                      {activeNavItem.path === '/cart' && cartItemCount > 0 && (
+                        <span className="ml-1 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {cartItemCount}
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  const showBadge = item.path === '/cart' && cartItemCount > 0;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsDropdownOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-b border-gray-100 last:border-b-0 ${
+                        active
+                          ? 'bg-primary-50 text-primary-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span>{item.label}</span>
+                      {showBadge && (
+                        <span className="ml-auto bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {cartItemCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </nav>
