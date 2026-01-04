@@ -1,5 +1,7 @@
 # CraftFlow
 
+![CraftFlow Logo](https://github.com/Judy0907P/craftflow/blob/main/frontend/public/craftflow_wide.png)
+
 A comprehensive inventory management system for handcraft businesses. This application helps you manage parts inventory, product inventory, recipes (BOM), production, sales, and orders with full cost tracking and profit analytics.
 
 ## Features
