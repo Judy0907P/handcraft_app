@@ -210,7 +210,7 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     }
   };
 
-  const handleImageUpload = async () => {
+  const _handleImageUpload = async () => {
     const file = fileInputRef.current?.files?.[0];
     if (!file || !part) return;
 

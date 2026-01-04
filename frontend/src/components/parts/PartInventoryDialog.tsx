@@ -256,7 +256,7 @@ export default function PartInventoryDialog({
                       name="cost_type"
                       value="unit"
                       checked={costType === 'unit'}
-                      onChange={(e) => {
+                      onChange={() => {
                         setCostType('unit');
                         setTotalCost('');
                       }}
@@ -270,7 +270,7 @@ export default function PartInventoryDialog({
                       name="cost_type"
                       value="total"
                       checked={costType === 'total'}
-                      onChange={(e) => {
+                      onChange={() => {
                         setCostType('total');
                         setUnitCost('');
                       }}
@@ -289,7 +289,7 @@ export default function PartInventoryDialog({
                           name="cost_currency"
                           value={currentOrg.main_currency}
                           checked={costCurrency === currentOrg.main_currency}
-                          onChange={(e) => setCostCurrency(currentOrg.main_currency)}
+                          onChange={() => setCostCurrency(currentOrg.main_currency)}
                           className="mr-2"
                         />
                         <span>{currentOrg.main_currency}</span>
@@ -300,7 +300,11 @@ export default function PartInventoryDialog({
                           name="cost_currency"
                           value={currentOrg.additional_currency}
                           checked={costCurrency === currentOrg.additional_currency}
-                          onChange={(e) => setCostCurrency(currentOrg.additional_currency)}
+                          onChange={() => {
+                            if (currentOrg.additional_currency) {
+                              setCostCurrency(currentOrg.additional_currency);
+                            }
+                          }}
                           className="mr-2"
                         />
                         <span>{currentOrg.additional_currency}</span>

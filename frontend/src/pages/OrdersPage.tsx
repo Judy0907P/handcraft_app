@@ -222,7 +222,7 @@ const OrdersPage = () => {
     if (!selectedOrder) return;
     setSavingChannelPlatform(true);
     try {
-      const updateData: { channel?: string; platform_id?: string | null } = {};
+      const updateData: { channel?: 'online' | 'offline' | null; platform_id?: string | null } = {};
       if (channelValue !== '') {
         updateData.channel = channelValue as 'online' | 'offline';
       } else {

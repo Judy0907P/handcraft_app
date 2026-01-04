@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
 import { partSubtypesApi, partTypesApi } from '../../services/api';
-import { PartType, PartSubtype } from '../../types';
+import { PartType } from '../../types';
 import { X } from 'lucide-react';
 
 interface PartSubtypeModalProps {

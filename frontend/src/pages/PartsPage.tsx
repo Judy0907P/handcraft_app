@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
 import { partsApi, partTypesApi, partSubtypesApi } from '../services/api';
 import { Part, PartType, PartSubtype, SortOption, SortDirection } from '../types';
-import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, GripVertical, Package } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import PartModal from '../components/parts/PartModal';
 import PartTypeModal from '../components/parts/PartTypeModal';
 import PartSubtypeModal from '../components/parts/PartSubtypeModal';

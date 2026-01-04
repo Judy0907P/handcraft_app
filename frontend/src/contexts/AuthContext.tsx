@@ -72,7 +72,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, password: string, username?: string) => {
     try {
-      const response = await authApi.register({ email, password, username });
+      // Generate default username from email if not provided
+      const finalUsername = username || email.split('@')[0] || 'user';
+      const response = await authApi.register({ email, password, username: finalUsername });
       const token = response.data.access_token;
       const userData = {
         email: response.data.email,

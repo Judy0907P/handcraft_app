@@ -115,7 +115,7 @@ const SettingsPage = () => {
         updateData.additional_currency = currencyFormData.additional_currency;
       } else {
         // If empty, clear the additional currency
-        updateData.additional_currency = null;
+        updateData.additional_currency = undefined;
       }
       if (currencyFormData.exchange_rate) {
         const exchangeRate = parseFloat(currencyFormData.exchange_rate);

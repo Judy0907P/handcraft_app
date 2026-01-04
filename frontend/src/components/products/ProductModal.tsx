@@ -3,8 +3,9 @@ import { useOrg } from '../../contexts/OrgContext';
 import { productsApi, productTypesApi, productSubtypesApi, productStatusLabelsApi, ProductStatusLabel, partsApi, recipesApi, RecipeLine, partTypesApi, partSubtypesApi } from '../../services/api';
 import { Product, ProductType, ProductSubtype, Part, PartType, PartSubtype } from '../../types';
 import { X, Plus, Upload, Image as ImageIcon, Trash2, Search, Edit } from 'lucide-react';
-import ProductTypeModal from './ProductTypeModal';
-import ProductSubtypeModal from './ProductSubtypeModal';
+// ProductTypeModal and ProductSubtypeModal imports removed - not used in this component
+// import ProductTypeModal from './ProductTypeModal';
+// import ProductSubtypeModal from './ProductSubtypeModal';
 
 interface ProductModalProps {
   product: Product | null;
@@ -33,7 +34,8 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   });
   
   // Exchange rate from organization settings: 1 main_currency = exchange_rate additional_currency
-  const EXCHANGE_RATE = currentOrg?.exchange_rate ? parseFloat(currentOrg.exchange_rate) : 1.0;
+  // Currently not used but kept for potential future use
+  // const EXCHANGE_RATE = currentOrg?.exchange_rate ? parseFloat(currentOrg.exchange_rate) : 1.0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -113,7 +115,8 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   useEffect(() => {
     if (product) {
       const productSubtype = productSubtypes.find((st) => st.product_subtype_id === product.product_subtype_id);
-      const productType = productSubtype ? productTypes.find((t) => t.product_type_id === productSubtype.product_type_id) : null;
+      // Find product type for the subtype (not used directly but kept for potential future use)
+      const _productType = productSubtype ? productTypes.find((t) => t.product_type_id === productSubtype.product_type_id) : null;
       
       setFormData({
         name: product.name,
