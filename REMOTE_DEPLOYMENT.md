@@ -276,7 +276,7 @@ docker compose exec postgres bash -c "for f in /tmp/schema/*.sql; do psql -U cra
 - **`frontend/nginx.conf`** - Nginx configuration for serving frontend
 
 #### Deployment Scripts
-- **`deploy.sh`** - Helper script for common deployment tasks
+- **`deploy.sh`** - Helper script for common deployment tasks (see [Using deploy.sh](#using-deploysh) section)
 - **`scripts/refresh_db_docker.sh`** - Database refresh script (⚠️ deletes all data)
 
 ### Environment Variables
@@ -386,6 +386,79 @@ chmod +x /opt/backup-craftflow.sh
 
 ## Monitoring and Maintenance
 
+### Using deploy.sh
+
+The `deploy.sh` script provides a convenient wrapper for common Docker Compose operations. It includes safety checks and colored output.
+
+**Make the script executable:**
+```bash
+chmod +x deploy.sh
+```
+
+**Available commands:**
+```bash
+# Start all services
+./deploy.sh start
+
+# Stop all services
+./deploy.sh stop
+
+# Restart all services
+./deploy.sh restart
+
+# View logs (all services)
+./deploy.sh logs
+
+# View logs for specific service
+./deploy.sh logs backend
+./deploy.sh logs caddy
+
+# Build Docker images
+./deploy.sh build
+
+# Rebuild from scratch (no cache)
+./deploy.sh rebuild
+
+# Update application (git pull + rebuild)
+./deploy.sh update
+
+# Check service status and health
+./deploy.sh status
+
+# Create database backup
+./deploy.sh backup
+
+# Open shell in container (default: backend)
+./deploy.sh shell
+./deploy.sh shell postgres
+
+# Refresh database (⚠️ WARNING: Deletes all data!)
+./deploy.sh db-refresh
+```
+
+**Examples:**
+```bash
+# Start everything for the first time
+./deploy.sh start
+
+# Check if everything is running properly
+./deploy.sh status
+
+# View backend logs to debug issues
+./deploy.sh logs backend
+
+# Update after pulling new code
+./deploy.sh update
+
+# Create a backup before making changes
+./deploy.sh backup
+```
+
+The script performs initial checks:
+- Ensures `.env` file exists (creates from `env.example` if missing)
+- Warns if Caddyfile still contains placeholder domain
+- Performs health checks after starting/restarting services
+
 ### View Logs
 
 ```bash
@@ -402,6 +475,13 @@ docker compose logs -f minio
 
 ### Update Application
 
+**Using deploy.sh (recommended):**
+```bash
+cd /opt/craftflow
+./deploy.sh update
+```
+
+**Manual update:**
 ```bash
 cd /opt/craftflow
 git pull  # if using git
@@ -446,6 +526,8 @@ docker compose up -d
 docker compose exec -T postgres pg_dump -U craftflow_user craftflow_db > backup.sql
 
 # Refresh database (⚠️ WARNING: Deletes all data!)
+./deploy.sh db-refresh
+# Or manually:
 ./scripts/refresh_db_docker.sh
 ```
 
