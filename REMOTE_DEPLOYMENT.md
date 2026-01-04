@@ -42,7 +42,6 @@ git clone <your-repo> craftflow
 cd craftflow
 cp env.example .env
 nano .env  # Update all values!
-nano Caddyfile  # Replace 'yourdomain.com'
 docker-compose build
 docker-compose up -d
 
@@ -146,11 +145,11 @@ docker-compose logs -f
    CLOUDFLARE_API_TOKEN=<your-cloudflare-api-token>
    ```
 
-3. **Update Caddyfile with Your Domain**
+3. **Review Caddyfile**
    ```bash
    nano Caddyfile
    ```
-   Replace `yourdomain.com` with your actual domain name.
+   Make sure `{env.DOMAIN}, www.{env.DOMAIN}` match Cloudflare settings.
 
 4. **Build and Start Services**
    ```bash
@@ -168,9 +167,9 @@ docker-compose logs -f
 
 The custom Caddy image includes the Cloudflare DNS plugin, so you can use DNS-01 challenges for SSL certificates.
 
-1. **Update Caddyfile** to use Cloudflare DNS challenge:
+1. **Review Caddyfile** to use Cloudflare DNS challenge:
    ```caddy
-   yourdomain.com {
+   {env.DOMAIN}, www.{env.DOMAIN} {
        # Cloudflare DNS challenge for SSL
        tls {
            dns cloudflare {env.CLOUDFLARE_API_TOKEN}
