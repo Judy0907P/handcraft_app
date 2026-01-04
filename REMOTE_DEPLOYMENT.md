@@ -30,7 +30,7 @@ For experienced users, here's the condensed deployment process:
 ssh root@your_server_ip
 apt update && apt upgrade -y
 curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
-apt install docker-compose -y
+apt-get update && apt-get install docker-compose-plugin -y
 
 # 2. Configure Cloudflare DNS
 # Add A record: @ → your_server_ip (Proxied - orange cloud)
@@ -42,12 +42,12 @@ git clone <your-repo> craftflow
 cd craftflow
 cp env.example .env
 nano .env  # Update all values!
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 
 # 4. Verify
-docker-compose ps
-docker-compose logs -f
+docker compose ps
+docker compose logs -f
 ```
 
 **Access your application:**
@@ -81,8 +81,8 @@ docker-compose logs -f
    curl -fsSL https://get.docker.com -o get-docker.sh
    sh get-docker.sh
 
-   # Install Docker Compose
-   apt install docker-compose -y
+   # Install Docker Compose V2 (plugin)
+   apt-get update && apt-get install docker-compose-plugin -y
 
    # Add your user to docker group (if not using root)
    usermod -aG docker $USER
@@ -153,14 +153,14 @@ docker-compose logs -f
 
 4. **Build and Start Services**
    ```bash
-   docker-compose build
-   docker-compose up -d
+   docker compose build
+   docker compose up -d
    ```
 
 5. **Check Service Status**
    ```bash
-   docker-compose ps
-   docker-compose logs -f  # Watch logs
+   docker compose ps
+   docker compose logs -f  # Watch logs
    ```
 
 ### Step 4: Configure Caddy with Cloudflare DNS Challenge
@@ -211,8 +211,8 @@ The custom Caddy image includes the Cloudflare DNS plugin, so you can use DNS-01
 
 3. **Rebuild Caddy container** (if needed):
    ```bash
-   docker-compose build caddy
-   docker-compose up -d caddy
+   docker compose build caddy
+   docker compose up -d caddy
    ```
 
 **Alternative SSL Options:**
@@ -231,7 +231,7 @@ The custom Caddy image includes the Cloudflare DNS plugin, so you can use DNS-01
 The database schema should be automatically initialized from the `db/schema` directory when the PostgreSQL container is first created. Verify:
 
 ```bash
-docker-compose exec postgres psql -U craftflow_user -d craftflow_db -c "\dt"
+docker compose exec postgres psql -U craftflow_user -d craftflow_db -c "\dt"
 ```
 
 If tables don't exist, you can use the refresh script:
@@ -248,7 +248,7 @@ Or manually run schema files:
 docker cp db/schema postgres:/tmp/schema
 
 # Execute schema files
-docker-compose exec postgres bash -c "for f in /tmp/schema/*.sql; do psql -U craftflow_user -d craftflow_db -f \$f; done"
+docker compose exec postgres bash -c "for f in /tmp/schema/*.sql; do psql -U craftflow_user -d craftflow_db -f \$f; done"
 ```
 
 **⚠️ Warning**: The refresh script will permanently delete all data. Use with caution!
@@ -265,7 +265,7 @@ docker-compose exec postgres bash -c "for f in /tmp/schema/*.sql; do psql -U cra
 ### Deployment Files
 
 #### Core Deployment Files
-- **`docker-compose.yml`** - Orchestrates all services (PostgreSQL, MinIO, Backend, Frontend, Caddy)
+- **`docker compose.yml`** - Orchestrates all services (PostgreSQL, MinIO, Backend, Frontend, Caddy)
 - **`Caddyfile`** - Reverse proxy configuration with automatic SSL
 - **`env.example`** - Environment variable template (copy to `.env` and configure)
 - **`caddy/Dockerfile`** - Custom Caddy build with Cloudflare DNS plugin
@@ -360,10 +360,10 @@ BACKUP_DIR="/opt/backups"
 mkdir -p $BACKUP_DIR
 
 # Backup database
-docker-compose exec -T postgres pg_dump -U craftflow_user craftflow_db > $BACKUP_DIR/db_$(date +%Y%m%d_%H%M%S).sql
+docker compose exec -T postgres pg_dump -U craftflow_user craftflow_db > $BACKUP_DIR/db_$(date +%Y%m%d_%H%M%S).sql
 
 # Backup MinIO data (optional)
-# docker-compose exec -T minio mc mirror /data $BACKUP_DIR/minio_$(date +%Y%m%d_%H%M%S)
+# docker compose exec -T minio mc mirror /data $BACKUP_DIR/minio_$(date +%Y%m%d_%H%M%S)
 
 # Keep only last 7 days of backups
 find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
@@ -390,14 +390,14 @@ chmod +x /opt/backup-craftflow.sh
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f caddy
-docker-compose logs -f postgres
-docker-compose logs -f minio
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f caddy
+docker compose logs -f postgres
+docker compose logs -f minio
 ```
 
 ### Update Application
@@ -405,20 +405,20 @@ docker-compose logs -f minio
 ```bash
 cd /opt/craftflow
 git pull  # if using git
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
 ### Restart Services
 
 ```bash
 # Restart specific service
-docker-compose restart backend
-docker-compose restart frontend
-docker-compose restart caddy
+docker compose restart backend
+docker compose restart frontend
+docker compose restart caddy
 
 # Restart all services
-docker-compose restart
+docker compose restart
 ```
 
 ### Check Resource Usage
@@ -431,19 +431,19 @@ docker stats
 
 ```bash
 # View logs
-docker-compose logs -f [service-name]
+docker compose logs -f [service-name]
 
 # Restart service
-docker-compose restart [service-name]
+docker compose restart [service-name]
 
 # Stop everything
-docker-compose down
+docker compose down
 
 # Start everything
-docker-compose up -d
+docker compose up -d
 
 # Backup database
-docker-compose exec -T postgres pg_dump -U craftflow_user craftflow_db > backup.sql
+docker compose exec -T postgres pg_dump -U craftflow_user craftflow_db > backup.sql
 
 # Refresh database (⚠️ WARNING: Deletes all data!)
 ./scripts/refresh_db_docker.sh
@@ -453,53 +453,53 @@ docker-compose exec -T postgres pg_dump -U craftflow_user craftflow_db > backup.
 
 ### Caddy SSL Certificate Issues
 
-- Check Caddy logs: `docker-compose logs caddy`
+- Check Caddy logs: `docker compose logs caddy`
 - Verify DNS records point to your server: `dig yourdomain.com`
 - Ensure port 80 and 443 are open: `ufw status`
 - Check Cloudflare proxy settings
 - Verify `CLOUDFLARE_API_TOKEN` is set correctly in `.env`
 - Ensure Caddyfile has the correct domain name
-- Rebuild Caddy if needed: `docker-compose build caddy && docker-compose up -d caddy`
+- Rebuild Caddy if needed: `docker compose build caddy && docker compose up -d caddy`
 
 **Common error**: "module not registered: dns.providers.cloudflare"
-- Solution: The custom Caddy Dockerfile includes the Cloudflare plugin. Rebuild: `docker-compose build caddy`
+- Solution: The custom Caddy Dockerfile includes the Cloudflare plugin. Rebuild: `docker compose build caddy`
 
 ### Can't Access Site
 
 - Check DNS: `dig yourdomain.com`
 - Check firewall: `ufw status`
-- Check logs: `docker-compose logs caddy`
-- Verify all services are running: `docker-compose ps`
+- Check logs: `docker compose logs caddy`
+- Verify all services are running: `docker compose ps`
 - Check if domain is correctly set in Caddyfile
 
 ### Database Connection Issues
 
-- Verify database is healthy: `docker-compose ps postgres`
+- Verify database is healthy: `docker compose ps postgres`
 - Check connection string in `.env`
-- Test connection: `docker-compose exec postgres psql -U craftflow_user -d craftflow_db`
-- View logs: `docker-compose logs postgres`
+- Test connection: `docker compose exec postgres psql -U craftflow_user -d craftflow_db`
+- View logs: `docker compose logs postgres`
 
 ### MinIO Access Issues
 
-- Verify MinIO is running: `docker-compose ps minio`
-- Check MinIO logs: `docker-compose logs minio`
+- Verify MinIO is running: `docker compose ps minio`
+- Check MinIO logs: `docker compose logs minio`
 - Verify bucket exists: Access MinIO console at http://localhost:9001 (via SSH tunnel)
 - Check credentials in `.env`
 
 ### Frontend Not Loading
 
-- Check frontend logs: `docker-compose logs frontend`
+- Check frontend logs: `docker compose logs frontend`
 - Verify API_URL is correct in `.env`
 - Check browser console for errors
-- Verify Caddy is routing correctly: `docker-compose logs caddy`
-- Ensure backend is running: `docker-compose ps backend`
+- Verify Caddy is routing correctly: `docker compose logs caddy`
+- Ensure backend is running: `docker compose ps backend`
 
 ### Service Won't Start
 
-- Check logs: `docker-compose logs [service-name]`
+- Check logs: `docker compose logs [service-name]`
 - Verify environment variables: `cat .env`
-- Check container status: `docker-compose ps`
-- Try rebuilding: `docker-compose build [service-name]`
+- Check container status: `docker compose ps`
+- Try rebuilding: `docker compose build [service-name]`
 - Check disk space: `df -h`
 
 ## Additional Resources
@@ -514,9 +514,9 @@ docker-compose exec -T postgres pg_dump -U craftflow_user craftflow_db > backup.
 
 For issues specific to this deployment, check:
 
-1. Service logs: `docker-compose logs [service-name]`
-2. Container status: `docker-compose ps`
-3. Network connectivity: `docker-compose exec backend ping postgres`
+1. Service logs: `docker compose logs [service-name]`
+2. Container status: `docker compose ps`
+3. Network connectivity: `docker compose exec backend ping postgres`
 4. Environment variables: `cat .env`
-5. Caddyfile syntax: `docker-compose exec caddy caddy validate --config /etc/caddy/Caddyfile`
+5. Caddyfile syntax: `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`
 

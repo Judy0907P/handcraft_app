@@ -33,11 +33,11 @@ fi
 # Function to check service health
 check_health() {
     echo -e "\n${GREEN}Checking service health...${NC}"
-    docker-compose ps
+    docker compose ps
     echo ""
     
     # Check if backend is healthy
-    if docker-compose exec -T backend curl -f http://localhost:8000/health > /dev/null 2>&1; then
+    if docker compose exec -T backend curl -f http://localhost:8000/health > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Backend is healthy${NC}"
     else
         echo -e "${RED}✗ Backend health check failed${NC}"
@@ -48,38 +48,38 @@ check_health() {
 case "${1:-}" in
     start)
         echo -e "${GREEN}Starting services...${NC}"
-        docker-compose up -d
+        docker compose up -d
         echo -e "${GREEN}Waiting for services to start...${NC}"
         sleep 5
         check_health
         ;;
     stop)
         echo -e "${YELLOW}Stopping services...${NC}"
-        docker-compose down
+        docker compose down
         ;;
     restart)
         echo -e "${YELLOW}Restarting services...${NC}"
-        docker-compose restart
+        docker compose restart
         sleep 5
         check_health
         ;;
     logs)
         service="${2:-}"
         if [ -z "$service" ]; then
-            docker-compose logs -f
+            docker compose logs -f
         else
-            docker-compose logs -f "$service"
+            docker compose logs -f "$service"
         fi
         ;;
     build)
         echo -e "${GREEN}Building services...${NC}"
-        docker-compose build
+        docker compose build
         ;;
     rebuild)
         echo -e "${GREEN}Rebuilding services...${NC}"
-        docker-compose down
-        docker-compose build --no-cache
-        docker-compose up -d
+        docker compose down
+        docker compose build --no-cache
+        docker compose up -d
         sleep 5
         check_health
         ;;
@@ -88,8 +88,8 @@ case "${1:-}" in
         if [ -d .git ]; then
             git pull
         fi
-        docker-compose build
-        docker-compose up -d
+        docker compose build
+        docker compose up -d
         sleep 5
         check_health
         ;;
@@ -100,13 +100,13 @@ case "${1:-}" in
         echo -e "${GREEN}Creating database backup...${NC}"
         BACKUP_DIR="./backups"
         mkdir -p "$BACKUP_DIR"
-        docker-compose exec -T postgres pg_dump -U craftflow_user craftflow_db > "$BACKUP_DIR/db_$(date +%Y%m%d_%H%M%S).sql"
+        docker compose exec -T postgres pg_dump -U craftflow_user craftflow_db > "$BACKUP_DIR/db_$(date +%Y%m%d_%H%M%S).sql"
         echo -e "${GREEN}✓ Backup saved to $BACKUP_DIR/${NC}"
         ;;
     shell)
         service="${2:-backend}"
         echo -e "${GREEN}Opening shell in $service...${NC}"
-        docker-compose exec "$service" /bin/bash || docker-compose exec "$service" /bin/sh
+        docker compose exec "$service" /bin/bash || docker compose exec "$service" /bin/sh
         ;;
     db-refresh)
         echo -e "${YELLOW}⚠️  WARNING: This will delete all database data!${NC}"

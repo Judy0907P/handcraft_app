@@ -41,7 +41,7 @@ This directory contains scripts for managing the CraftFlow database.
 ```
 
 **Prerequisites**:
-- Docker Compose services must be running: `docker-compose up -d postgres`
+- Docker Compose services must be running: `docker compose up -d postgres`
 
 **Environment Variables** (optional, with safe defaults):
 - `POSTGRES_DB` - Database name (default: `craftflow_db`)
@@ -111,7 +111,7 @@ export POSTGRES_USER=myuser
 ### Docker Development
 ```bash
 # Start services
-docker-compose up -d postgres
+docker compose up -d postgres
 
 # Wait for database to be ready
 sleep 5
@@ -125,7 +125,7 @@ sleep 5
 ## Troubleshooting
 
 **Error: "container not found"**
-- Make sure Docker Compose is running: `docker-compose ps`
+- Make sure Docker Compose is running: `docker compose ps`
 - Check container name: `docker ps -a`
 
 **Error: "permission denied"**
@@ -133,5 +133,5 @@ sleep 5
 
 **Error: "connection refused"**
 - For local: Check if PostgreSQL is running
-- For Docker: Check if container is healthy: `docker-compose ps postgres`
+- For Docker: Check if container is healthy: `docker compose ps postgres`
 

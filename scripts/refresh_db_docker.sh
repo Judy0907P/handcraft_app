@@ -2,7 +2,7 @@
 
 # Database refresh script for CraftFlow (Docker version)
 # This script refreshes the database in a Docker container
-# Use this when running with docker-compose
+# Use this when running with docker compose
 
 set -e  # Exit on error
 
@@ -35,7 +35,7 @@ print_error() {
 # Check if Docker container exists
 if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     print_error "PostgreSQL container '$CONTAINER_NAME' not found!"
-    print_info "Make sure docker-compose is running: docker-compose up -d postgres"
+    print_info "Make sure docker compose is running: docker compose up -d postgres"
     exit 1
 fi
 
