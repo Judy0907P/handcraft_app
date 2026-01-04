@@ -115,8 +115,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
 
   useEffect(() => {
     if (product) {
-      const productSubtype = productSubtypes.find((st) => st.product_subtype_id === product.product_subtype_id);
-      
       setFormData({
         name: product.name,
         description: product.description || '',
