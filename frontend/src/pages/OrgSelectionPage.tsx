@@ -44,6 +44,13 @@ const OrgSelectionPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <img 
+              src="/craftflow_wide.png" 
+              alt="CraftFlow" 
+              className="h-16"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Select Your Shop</h1>
           <p className="text-gray-600">Choose an organization or create a new one</p>
         </div>

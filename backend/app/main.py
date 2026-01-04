@@ -5,7 +5,7 @@ from pathlib import Path
 from app.routers import parts, products, production, sales, analytics, organizations, part_types, product_types, recipes, auth, part_status_labels, product_status_labels, platforms, orders
 
 app = FastAPI(
-    title="Handcraft Management API",
+    title="CraftFlow API",
     description="API for managing handcraft inventory, production, and sales",
     version="1.0.0"
 )
@@ -44,7 +44,7 @@ if uploads_dir.exists():
 @app.get("/")
 def root():
     return {
-        "message": "Handcraft Management API",
+        "message": "CraftFlow API",
         "docs": "/docs",
         "version": "1.0.0"
     }

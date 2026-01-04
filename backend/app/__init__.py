@@ -1,2 +1,2 @@
-# FastAPI Backend for Handcraft Management App
+# FastAPI Backend for CraftFlow App
 

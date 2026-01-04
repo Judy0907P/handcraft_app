@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus } from 'lucide-react';
 
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -51,9 +50,11 @@ const RegisterPage = () => {
       <div className="max-w-md w-full mx-4">
         <div className="bg-white rounded-lg shadow-xl p-8">
           <div className="flex items-center justify-center mb-6">
-            <div className="bg-primary-500 p-3 rounded-full">
-              <UserPlus className="w-8 h-8 text-white" />
-            </div>
+            <img 
+              src="/craftflow_wide.png" 
+              alt="CraftFlow" 
+              className="h-12"
+            />
           </div>
           <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">Create Account</h1>
           <p className="text-center text-gray-600 mb-8">Sign up to get started</p>

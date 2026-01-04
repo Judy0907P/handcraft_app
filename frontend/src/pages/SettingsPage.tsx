@@ -398,7 +398,7 @@ const SettingsPage = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">About</h2>
           <p className="text-gray-600">
-            Handcraft Management System v1.0.0
+            CraftFlow v1.0.0
           </p>
           <p className="text-gray-600 mt-2">
             Manage your handcraft inventory, products, and sales all in one place.

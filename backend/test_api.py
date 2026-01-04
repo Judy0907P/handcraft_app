@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Handcraft Management API
+Test script for CraftFlow API
 Run this after starting the server to verify all endpoints work correctly
 """
 
@@ -150,7 +150,7 @@ def test_profit_summary():
 def main():
     """Run all tests"""
     print("="*60)
-    print("Handcraft Management API Test Suite")
+    print("CraftFlow API Test Suite")
     print("="*60)
     print(f"Testing against: {BASE_URL}")
     print(f"Test Org ID: {TEST_ORG_ID}")
