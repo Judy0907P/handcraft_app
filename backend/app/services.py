@@ -494,13 +494,15 @@ def create_order(db: Session, order: OrderCreate) -> Order:
 
 
 def get_order(db: Session, order_id: UUID) -> Order:
-    """Get an order by ID"""
-    return db.query(Order).filter(Order.order_id == order_id).first()
+    """Get an order by ID with order lines"""
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.order_lines)).filter(Order.order_id == order_id).first()
 
 
 def get_orders_by_org(db: Session, org_id: UUID, skip: int = 0, limit: int = 100) -> List[Order]:
     """Get all orders for an organization"""
-    return db.query(Order).filter(Order.org_id == org_id).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.order_lines)).filter(Order.org_id == org_id).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def update_order_status(db: Session, order_id: UUID, new_status: str) -> Order:
@@ -517,5 +519,37 @@ def update_order_status(db: Session, order_id: UUID, new_status: str) -> Order:
     
     # Get the updated order
     db_order = db.query(Order).filter(Order.order_id == order_id).first()
+    return db_order
+
+
+def return_order(db: Session, order_id: UUID) -> Order:
+    """Return a shipped order - marks as canceled and appends 'returned' to notes"""
+    result = db.execute(
+        text("SELECT return_order(CAST(:order_id AS UUID))"),
+        {
+            "order_id": str(order_id)
+        }
+    )
+    result.scalar()
+    db.commit()
+    
+    # Get the updated order
+    db_order = db.query(Order).filter(Order.order_id == order_id).first()
+    return db_order
+
+
+def update_order(db: Session, order_id: UUID, order_update: dict) -> Order:
+    """Update order fields (like notes, channel, platform_id)"""
+    db_order = db.query(Order).filter(Order.order_id == order_id).first()
+    if not db_order:
+        return None
+    
+    for key, value in order_update.items():
+        if hasattr(db_order, key):
+            # Allow setting to None for optional fields like channel, platform_id, notes
+            setattr(db_order, key, value)
+    
+    db.commit()
+    db.refresh(db_order)
     return db_order
 

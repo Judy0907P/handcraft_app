@@ -190,6 +190,11 @@ BEGIN
       AND org_id = p_org_id;
   END LOOP;
 
+  -- If channel is 'offline', automatically close the order (creates sales transactions)
+  IF p_channel = 'offline' THEN
+    PERFORM update_order_status(v_order_id, 'closed');
+  END IF;
+
   RETURN v_order_id;
 END;
 $$;
@@ -199,14 +204,17 @@ $$;
 --
 -- Behavior:
 --  1) Validate status transition
---  2) If new_status is 'canceled', restore inventory (increase products.quantity)
---  3) If new_status is 'closed', call record_sale for each order line
---  4) Update order status and updated_at
+--  2) Prevent any changes to orders with status 'closed'
+--  3) Only allow cancellation from 'created' or 'completed' status
+--  4) If new_status is 'canceled', restore inventory (increase products.quantity)
+--  5) If new_status is 'closed', call record_sale for each order line
+--  6) Update order status and updated_at
 --
 -- Notes:
---  - Only 'created' orders can be canceled
+--  - Only 'created' or 'completed' orders can be canceled
 --  - 'closed' status triggers record_sale for each line item
 --  - Inventory is restored when canceled
+--  - Once an order is 'closed', no further status changes are allowed
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_order_status(
   p_order_id UUID,
@@ -234,17 +242,19 @@ BEGIN
     RAISE EXCEPTION 'Order % not found', p_order_id;
   END IF;
 
+  -- Prevent any status changes after order is closed
+  IF v_old_status = 'closed' THEN
+    RAISE EXCEPTION 'Cannot change status of a closed order';
+  END IF;
+
   -- Handle status transitions
   IF p_new_status = 'canceled' THEN
-    -- Only allow canceling orders that are not already closed or canceled
-    IF v_old_status = 'closed' THEN
-      RAISE EXCEPTION 'Cannot cancel a closed order';
-    END IF;
-    IF v_old_status = 'canceled' THEN
-      RAISE EXCEPTION 'Order is already canceled';
+    -- Only allow canceling orders from 'created' or 'completed' status
+    IF v_old_status NOT IN ('created', 'completed') THEN
+      RAISE EXCEPTION 'Order can only be canceled from "created" or "completed" status, current status is "%"', v_old_status;
     END IF;
 
-    -- Restore inventory for all order lines (inventory was reserved when order was created)
+    -- Restore inventory for all order lines
     FOR v_line IN SELECT product_id, quantity FROM order_lines WHERE order_id = p_order_id
     LOOP
       UPDATE products
@@ -253,6 +263,10 @@ BEGIN
       WHERE product_id = v_line.product_id
         AND org_id = v_org_id;
     END LOOP;
+
+    -- Note: Sales transactions (product_transactions) from closed orders are not deleted
+    -- This preserves the historical record. If you need to track refunds, you could
+    -- add a refund transaction type or add a refund flag to transactions.
 
   ELSIF p_new_status = 'closed' THEN
     -- Only allow closing non-canceled orders
@@ -275,6 +289,74 @@ BEGIN
   -- Update order status
   UPDATE orders
   SET status = p_new_status,
+      updated_at = now()
+  WHERE order_id = p_order_id;
+
+  RETURN p_order_id;
+END;
+$$;
+
+---------------------------------------------------------------------
+-- return_order(order_id) -> returns order_id
+--
+-- Behavior:
+--  1) Check order status is 'shipped'
+--  2) Mark order as 'canceled'
+--  3) Restore inventory (increase products.quantity)
+--  4) Append "returned" to notes (same format as tracking number)
+--
+-- Notes:
+--  - Only 'shipped' orders can be returned
+--  - This is similar to canceling but specifically for shipped orders
+--  - Appends "returned" to notes in the same way tracking numbers are appended
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION return_order(
+  p_order_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_org_id UUID;
+  v_old_status TEXT;
+  v_current_notes TEXT;
+  v_line RECORD;
+BEGIN
+  -- Get order details
+  SELECT org_id, status, notes INTO v_org_id, v_old_status, v_current_notes
+  FROM orders
+  WHERE order_id = p_order_id;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Order % not found', p_order_id;
+  END IF;
+
+  -- Only allow returning shipped orders
+  IF v_old_status != 'shipped' THEN
+    RAISE EXCEPTION 'Order can only be returned from "shipped" status, current status is "%"', v_old_status;
+  END IF;
+
+  -- Restore inventory for all order lines
+  FOR v_line IN SELECT product_id, quantity FROM order_lines WHERE order_id = p_order_id
+  LOOP
+    UPDATE products
+    SET quantity = quantity + v_line.quantity,
+        updated_at = now()
+    WHERE product_id = v_line.product_id
+      AND org_id = v_org_id;
+  END LOOP;
+
+  -- Append "returned" to notes (same format as tracking number)
+  v_current_notes := COALESCE(v_current_notes, '');
+  v_current_notes := CASE 
+    WHEN v_current_notes = '' THEN 'Returned'
+    ELSE v_current_notes || E'\nReturned'
+  END;
+
+  -- Update order status to canceled and append returned to notes
+  UPDATE orders
+  SET status = 'canceled',
+      notes = v_current_notes,
       updated_at = now()
   WHERE order_id = p_order_id;
 

@@ -289,7 +289,9 @@ export const ordersApi = {
   }) => api.post<Order>('/orders/', data),
   updateStatus: (orderId: string, status: 'created' | 'completed' | 'shipped' | 'closed' | 'canceled') =>
     api.patch<Order>(`/orders/${orderId}/status`, { status }),
-  update: (orderId: string, data: { notes?: string }) =>
+  update: (orderId: string, data: { notes?: string; channel?: 'online' | 'offline' | null; platform_id?: string | null }) =>
     api.patch<Order>(`/orders/${orderId}`, data),
+  returnOrder: (orderId: string) =>
+    api.post<Order>(`/orders/${orderId}/return`),
 };
 

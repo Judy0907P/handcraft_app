@@ -99,6 +99,11 @@ const OrdersPage = () => {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editingChannel, setEditingChannel] = useState(false);
+  const [channelValue, setChannelValue] = useState<'online' | 'offline' | ''>('');
+  const [editingPlatform, setEditingPlatform] = useState(false);
+  const [platformValue, setPlatformValue] = useState<string>('');
+  const [savingChannelPlatform, setSavingChannelPlatform] = useState(false);
 
   useEffect(() => {
     if (currentOrg) {
@@ -174,12 +179,20 @@ const OrdersPage = () => {
       setSelectedOrder(response.data);
       setNotesValue(response.data.notes || '');
       setEditingNotes(false);
+      setChannelValue(response.data.channel || '');
+      setEditingChannel(false);
+      setPlatformValue(response.data.platform_id || '');
+      setEditingPlatform(false);
     } catch (error) {
       console.error('Failed to load order details:', error);
       // Fallback to order from list if API call fails
       setSelectedOrder(order);
       setNotesValue(order.notes || '');
       setEditingNotes(false);
+      setChannelValue(order.channel || '');
+      setEditingChannel(false);
+      setPlatformValue(order.platform_id || '');
+      setEditingPlatform(false);
     }
   };
 
@@ -203,6 +216,42 @@ const OrdersPage = () => {
   const handleCancelEditNotes = () => {
     setNotesValue(selectedOrder?.notes || '');
     setEditingNotes(false);
+  };
+
+  const handleSaveChannelPlatform = async () => {
+    if (!selectedOrder) return;
+    setSavingChannelPlatform(true);
+    try {
+      const updateData: { channel?: string; platform_id?: string | null } = {};
+      if (channelValue !== '') {
+        updateData.channel = channelValue as 'online' | 'offline';
+      } else {
+        updateData.channel = null;
+      }
+      if (platformValue !== '') {
+        updateData.platform_id = platformValue;
+      } else {
+        updateData.platform_id = null;
+      }
+      await ordersApi.update(selectedOrder.order_id, updateData);
+      const updatedOrder = await ordersApi.getById(selectedOrder.order_id);
+      setSelectedOrder(updatedOrder.data);
+      setEditingChannel(false);
+      setEditingPlatform(false);
+      await loadData();
+    } catch (error: any) {
+      console.error('Failed to update channel/platform:', error);
+      alert(error.response?.data?.detail || 'Failed to update channel/platform. Please try again.');
+    } finally {
+      setSavingChannelPlatform(false);
+    }
+  };
+
+  const handleCancelEditChannelPlatform = () => {
+    setChannelValue(selectedOrder?.channel || '');
+    setPlatformValue(selectedOrder?.platform_id || '');
+    setEditingChannel(false);
+    setEditingPlatform(false);
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: Order['status'], trackingNumber?: string) => {
@@ -251,6 +300,24 @@ const OrdersPage = () => {
   const handleTrackingCancel = () => {
     setPendingStatusUpdate(null);
     setShowTrackingModal(false);
+  };
+
+  const handleReturnOrder = async (orderId: string) => {
+    setUpdatingStatus(orderId);
+    try {
+      await ordersApi.returnOrder(orderId);
+      await loadData();
+      if (selectedOrder?.order_id === orderId) {
+        const updatedOrder = await ordersApi.getById(orderId);
+        setSelectedOrder(updatedOrder.data);
+        setNotesValue(updatedOrder.data.notes || '');
+      }
+    } catch (error: any) {
+      console.error('Failed to return order:', error);
+      alert(error.response?.data?.detail || 'Failed to return order. Please try again.');
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const totalRevenue = orders
@@ -460,13 +527,82 @@ const OrdersPage = () => {
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Channel</p>
-                  <p className="text-sm text-gray-900">{selectedOrder.channel || '-'}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-gray-600">Channel</p>
+                    {!editingChannel && !editingPlatform && (
+                      <button
+                        onClick={() => setEditingChannel(true)}
+                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {editingChannel ? (
+                    <div className="space-y-2">
+                      <select
+                        value={channelValue}
+                        onChange={(e) => setChannelValue(e.target.value as 'online' | 'offline' | '')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      >
+                        <option value="">None</option>
+                        <option value="online">Online</option>
+                        <option value="offline">Offline</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900">{selectedOrder.channel || '-'}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Platform</p>
-                  <p className="text-sm text-gray-900">{getPlatformName(selectedOrder.platform_id)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-gray-600">Platform</p>
+                    {!editingChannel && !editingPlatform && (
+                      <button
+                        onClick={() => setEditingPlatform(true)}
+                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {editingPlatform ? (
+                    <div className="space-y-2">
+                      <select
+                        value={platformValue}
+                        onChange={(e) => setPlatformValue(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      >
+                        <option value="">None</option>
+                        {platforms.map((platform) => (
+                          <option key={platform.platform_id} value={platform.platform_id}>
+                            {platform.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900">{getPlatformName(selectedOrder.platform_id)}</p>
+                  )}
                 </div>
+                {(editingChannel || editingPlatform) && (
+                  <div className="col-span-2 flex gap-2 pt-2">
+                    <button
+                      onClick={handleSaveChannelPlatform}
+                      disabled={savingChannelPlatform}
+                      className="px-3 py-1 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {savingChannelPlatform ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancelEditChannelPlatform}
+                      disabled={savingChannelPlatform}
+                      className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-medium text-gray-600">Created At</p>
                   <p className="text-sm text-gray-900">{format(new Date(selectedOrder.created_at), 'PPP p')}</p>
@@ -551,59 +687,74 @@ const OrdersPage = () => {
               </div>
 
               {/* Status Actions */}
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedOrder.status === 'created' && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to mark this order as completed?')) {
-                          handleStatusUpdate(selectedOrder.order_id, 'completed');
-                        }
-                      }}
-                      disabled={updatingStatus === selectedOrder.order_id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      Mark Completed
-                    </button>
-                  )}
-                  {selectedOrder.status === 'completed' && (
-                    <button
-                      onClick={() => handleShippedClick(selectedOrder.order_id)}
-                      disabled={updatingStatus === selectedOrder.order_id}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      Mark Shipped
-                    </button>
-                  )}
-                  {(selectedOrder.status === 'completed' || selectedOrder.status === 'shipped') && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to close this order? This will record the sale.')) {
-                          handleStatusUpdate(selectedOrder.order_id, 'closed');
-                        }
-                      }}
-                      disabled={updatingStatus === selectedOrder.order_id}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      Close Order
-                    </button>
-                  )}
-                  {selectedOrder.status !== 'canceled' && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to cancel this order? Inventory will be restored.')) {
-                          handleStatusUpdate(selectedOrder.order_id, 'canceled');
-                        }
-                      }}
-                      disabled={updatingStatus === selectedOrder.order_id}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      Cancel Order
-                    </button>
-                  )}
+              {selectedOrder.status !== 'closed' && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedOrder.status === 'created' && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to mark this order as completed?')) {
+                            handleStatusUpdate(selectedOrder.order_id, 'completed');
+                          }
+                        }}
+                        disabled={updatingStatus === selectedOrder.order_id}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Mark Completed
+                      </button>
+                    )}
+                    {selectedOrder.status === 'completed' && (
+                      <button
+                        onClick={() => handleShippedClick(selectedOrder.order_id)}
+                        disabled={updatingStatus === selectedOrder.order_id}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Mark Shipped
+                      </button>
+                    )}
+                    {(selectedOrder.status === 'completed' || selectedOrder.status === 'shipped') && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to close this order? This will record the sale.')) {
+                            handleStatusUpdate(selectedOrder.order_id, 'closed');
+                          }
+                        }}
+                        disabled={updatingStatus === selectedOrder.order_id}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Close Order
+                      </button>
+                    )}
+                    {selectedOrder.status === 'shipped' && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to return this order? It will be marked as canceled and inventory will be restored.')) {
+                            handleReturnOrder(selectedOrder.order_id);
+                          }
+                        }}
+                        disabled={updatingStatus === selectedOrder.order_id}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Return Order
+                      </button>
+                    )}
+                    {(selectedOrder.status === 'created' || selectedOrder.status === 'completed') && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to cancel this order? Inventory will be restored.')) {
+                            handleStatusUpdate(selectedOrder.order_id, 'canceled');
+                          }
+                        }}
+                        disabled={updatingStatus === selectedOrder.order_id}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Cancel Order
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

@@ -488,6 +488,12 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: Optional[str] = None  # 'created', 'completed', 'shipped', 'closed', 'canceled'
     notes: Optional[str] = None
+    channel: Optional[str] = None  # 'online' or 'offline'
+    platform_id: Optional[UUID] = None
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str  # 'created', 'completed', 'shipped', 'closed', 'canceled'
 
 
 class OrderResponse(OrderBase):
