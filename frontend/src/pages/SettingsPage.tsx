@@ -104,7 +104,7 @@ const SettingsPage = () => {
     try {
       const updateData: {
         main_currency?: string;
-        additional_currency?: string | null;
+        additional_currency?: string;
         exchange_rate?: string;
       } = {};
 
@@ -114,7 +114,7 @@ const SettingsPage = () => {
       if (currencyFormData.additional_currency) {
         updateData.additional_currency = currencyFormData.additional_currency;
       } else {
-        // If empty, clear the additional currency
+        // If empty, clear the additional currency (set to undefined, not null)
         updateData.additional_currency = undefined;
       }
       if (currencyFormData.exchange_rate) {

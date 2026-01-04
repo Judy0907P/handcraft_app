@@ -210,24 +210,7 @@ const PartModal = ({ part, partTypes, partSubtypes, onClose, onSave }: PartModal
     }
   };
 
-  const _handleImageUpload = async () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file || !part) return;
-
-    setUploadingImage(true);
-    try {
-      const response = await partsApi.uploadImage(part.part_id, file);
-      setFormData({ ...formData, image_url: response.data.image_url || '' });
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      if (response.data.image_url) {
-        setImagePreview(response.data.image_url.startsWith('http') ? response.data.image_url : `${apiBaseUrl}${response.data.image_url}`);
-      }
-    } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to upload image');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  // Image upload is handled inline in the file input onChange handler
 
   const handleImageDelete = async () => {
     if (!part || !part.image_url) return;

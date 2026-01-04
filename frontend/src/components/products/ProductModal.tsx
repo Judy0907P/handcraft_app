@@ -55,7 +55,8 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   const [recipeLines, setRecipeLines] = useState<Array<{ part_id: string; quantity: string }>>([]);
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [fifoCosts, setFifoCosts] = useState<Record<string, number>>({}); // part_id -> fifo_unit_cost
-  const [loadingParts, setLoadingParts] = useState(false);
+  // loadingParts state removed - not used for UI rendering
+  const [, setLoadingParts] = useState(false);
   const [partTypes, setPartTypes] = useState<PartType[]>([]);
   const [partSubtypes, setPartSubtypes] = useState<PartSubtype[]>([]);
   const [partSearchQuery, setPartSearchQuery] = useState<Record<number, string>>({});
@@ -115,8 +116,6 @@ const ProductModal = ({ product, productTypes, productSubtypes, onClose, onSave 
   useEffect(() => {
     if (product) {
       const productSubtype = productSubtypes.find((st) => st.product_subtype_id === product.product_subtype_id);
-      // Find product type for the subtype (not used directly but kept for potential future use)
-      const _productType = productSubtype ? productTypes.find((t) => t.product_type_id === productSubtype.product_type_id) : null;
       
       setFormData({
         name: product.name,
