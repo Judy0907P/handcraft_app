@@ -178,7 +178,7 @@ The app will be available at `http://localhost:3000` (or the port Vite assigns).
 - **Local Development Guide**: See `LOCAL_DEVELOPMENT.md` (start here for local testing)
 - **Backend Quick Start**: See `backend/QUICKSTART.md`
 - **Backend API Reference**: See `backend/README.md` and `backend/API_ENDPOINTS.md`
-- **Deployment Guide**: See `DEPLOYMENT.md` (for production deployment with Docker)
+- **Remote Deployment Guide**: See `REMOTE_DEPLOYMENT.md` (for production deployment with Docker)
 - **Recipe Management**: See `backend/RECIPE_MANAGEMENT.md`
 - **Installation Troubleshooting**: See `backend/INSTALL_TROUBLESHOOTING.md`
 - **Frontend Guide**: See `frontend/README.md`

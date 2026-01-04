@@ -114,7 +114,9 @@ services:
 
   # Caddy Reverse Proxy
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ./caddy
+      dockerfile: Dockerfile
     container_name: craftflow-caddy
     ports:
       - "80:80"
@@ -126,6 +128,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - caddy_logs:/var/log/caddy
     depends_on:
       - frontend
       - backend
@@ -139,6 +142,7 @@ volumes:
   minio_data:
   caddy_data:
   caddy_config:
+  caddy_logs:
 
 networks:
   craftflow-network:
