@@ -10,10 +10,16 @@ export interface CartItem {
 
 interface CartContextType {
   cartItems: CartItem[];
+  channel: 'online' | 'offline' | null;
+  platformId: string | null;
+  notes: string;
   addToCart: (product: Product, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   updateCustomPrice: (productId: string, price: string) => void;
+  setChannel: (channel: 'online' | 'offline' | null) => void;
+  setPlatformId: (platformId: string | null) => void;
+  setNotes: (notes: string) => void;
   clearCart: () => void;
   getTotalAmount: () => number;
   getItemCount: () => number;
@@ -24,6 +30,9 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [channel, setChannel] = useState<'online' | 'offline' | null>(null);
+  const [platformId, setPlatformId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string>('');
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -35,12 +44,28 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Failed to load cart from localStorage:', error);
       }
     }
+    const savedCartMeta = localStorage.getItem('cartMeta');
+    if (savedCartMeta) {
+      try {
+        const meta = JSON.parse(savedCartMeta);
+        setChannel(meta.channel || null);
+        setPlatformId(meta.platformId || null);
+        setNotes(meta.notes || '');
+      } catch (error) {
+        console.error('Failed to load cart metadata from localStorage:', error);
+      }
+    }
   }, []);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   }, [cartItems]);
+
+  // Save cart metadata to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('cartMeta', JSON.stringify({ channel, platformId, notes }));
+  }, [channel, platformId, notes]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
     setCartItems((prevItems) => {
@@ -85,7 +110,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = () => {
     setCartItems([]);
+    setChannel(null);
+    setPlatformId(null);
+    setNotes('');
     localStorage.removeItem('cart');
+    localStorage.removeItem('cartMeta');
   };
 
   const getTotalAmount = (): number => {
@@ -112,10 +141,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <CartContext.Provider
       value={{
         cartItems,
+        channel,
+        platformId,
+        notes,
         addToCart,
         removeFromCart,
         updateQuantity,
         updateCustomPrice,
+        setChannel,
+        setPlatformId,
+        setNotes,
         clearCart,
         getTotalAmount,
         getItemCount,

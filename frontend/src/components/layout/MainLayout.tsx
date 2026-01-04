@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { useCart } from '../../contexts/CartContext';
-import { Home, Package, ShoppingBag, ShoppingCart, DollarSign, Settings, LogOut, Building2 } from 'lucide-react';
+import { Home, Package, ShoppingBag, ShoppingCart, FileText, DollarSign, Settings, LogOut, Building2 } from 'lucide-react';
 
 const MainLayout = () => {
   const { logout } = useAuth();
@@ -28,6 +28,7 @@ const MainLayout = () => {
     { path: '/parts', icon: Package, label: 'Parts' },
     { path: '/products', icon: ShoppingBag, label: 'Products' },
     { path: '/cart', icon: ShoppingCart, label: 'Cart' },
+    { path: '/orders', icon: FileText, label: 'Orders' },
     { path: '/sales', icon: DollarSign, label: 'Sales' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];

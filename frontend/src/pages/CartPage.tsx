@@ -1,22 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
 import { useCart } from '../contexts/CartContext';
-import { salesApi, productsApi } from '../services/api';
-import { Product } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { ordersApi, platformsApi, productsApi } from '../services/api';
+import { Product, Platform } from '../types';
 import { ShoppingCart, Trash2, Plus, Minus, DollarSign, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const CartPage = () => {
   const { currentOrg } = useOrg();
-  const { cartItems, removeFromCart, updateQuantity, updateCustomPrice, clearCart, getTotalAmount } = useCart();
+  const { user } = useAuth();
+  const { 
+    cartItems, 
+    removeFromCart, 
+    updateQuantity, 
+    updateCustomPrice, 
+    clearCart, 
+    getTotalAmount,
+    channel,
+    platformId,
+    notes,
+    setChannel,
+    setPlatformId,
+    setNotes,
+  } = useCart();
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
     if (currentOrg && cartItems.length > 0) {
       loadProducts();
+      loadPlatforms();
     } else {
       setLoading(false);
     }
@@ -28,6 +45,16 @@ const CartPage = () => {
       loadProducts();
     }
   }, [cartItems, currentOrg]);
+
+  const loadPlatforms = async () => {
+    if (!currentOrg) return;
+    try {
+      const response = await platformsApi.getAll(currentOrg.org_id);
+      setPlatforms(response.data);
+    } catch (error) {
+      console.error('Failed to load platforms:', error);
+    }
+  };
 
   const loadProducts = async () => {
     if (!currentOrg) return;
@@ -55,7 +82,7 @@ const CartPage = () => {
   };
 
   const handleCheckout = async () => {
-    if (!currentOrg || cartItems.length === 0) return;
+    if (!currentOrg || !user?.user_id || cartItems.length === 0) return;
 
     // Validate all items have prices
     for (const item of cartItems) {
@@ -71,27 +98,35 @@ const CartPage = () => {
       }
     }
 
-    if (!confirm('Are you sure you want to checkout? This will record the sales.')) {
+    if (!confirm('Are you sure you want to checkout? This will create an order.')) {
       return;
     }
 
     setCheckingOut(true);
     try {
-      // Create a sale for each cart item
-      const salePromises = cartItems.map((item) => {
+      // Create order with cart items
+      const orderLines = cartItems.map((item) => {
         const product = getProduct(item.product_id);
         const unitPrice = item.customPrice || product?.total_cost || '0';
-        return salesApi.create(currentOrg.org_id, {
+        return {
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: unitPrice,
-        });
+        };
       });
 
-      await Promise.all(salePromises);
+      await ordersApi.create({
+        org_id: currentOrg.org_id,
+        user_id: user.user_id,
+        channel: channel || undefined,
+        platform_id: platformId || undefined,
+        notes: notes || undefined,
+        order_lines: orderLines,
+      });
+
       clearCart();
-      alert('Checkout successful! Sales have been recorded.');
-      navigate('/sales');
+      alert('Order created successfully!');
+      navigate('/orders');
     } catch (error: any) {
       console.error('Checkout failed:', error);
       alert(error.response?.data?.detail || 'Checkout failed. Please try again.');
@@ -152,6 +187,59 @@ const CartPage = () => {
               </>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* Order Information Section */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Channel
+            </label>
+            <select
+              value={channel || ''}
+              onChange={(e) => setChannel(e.target.value === '' ? null : e.target.value as 'online' | 'offline')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="">None</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Platform
+            </label>
+            <select
+              value={platformId || ''}
+              onChange={(e) => setPlatformId(e.target.value === '' ? null : e.target.value)}
+              disabled={!channel}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              <option value="">None</option>
+              {platforms
+                .filter((p) => !channel || p.channel === channel)
+                .map((platform) => (
+                  <option key={platform.platform_id} value={platform.platform_id}>
+                    {platform.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 

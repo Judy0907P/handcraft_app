@@ -18,6 +18,7 @@ class User(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     
     org_memberships = relationship("OrgMembership", back_populates="user")
+    orders = relationship("Order", back_populates="user")
 
 
 class Organization(Base):
@@ -40,6 +41,8 @@ class Organization(Base):
     product_transactions = relationship("ProductTransaction", back_populates="organization", cascade="all, delete-orphan")
     part_status_labels = relationship("PartStatusLabel", back_populates="organization", cascade="all, delete-orphan")
     product_status_labels = relationship("ProductStatusLabel", back_populates="organization", cascade="all, delete-orphan")
+    platforms = relationship("Platform", back_populates="organization", cascade="all, delete-orphan")
+    orders = relationship("Order", back_populates="organization", cascade="all, delete-orphan")
 
 
 class OrgMembership(Base):
@@ -215,6 +218,7 @@ class Product(Base):
     subtype = relationship("ProductSubtype", back_populates="products")
     recipe_lines = relationship("RecipeLine", back_populates="product", cascade="all, delete-orphan")
     product_transactions = relationship("ProductTransaction", back_populates="product")
+    order_lines = relationship("OrderLine", back_populates="product")
 
 
 class RecipeLine(Base):
@@ -278,5 +282,71 @@ class PartTransaction(Base):
     part = relationship("Part", back_populates="part_transactions")
     product_transaction = relationship("ProductTransaction", back_populates="part_transactions")
 
+
+class Platform(Base):
+    __tablename__ = "platforms"
+    
+    platform_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
+    name = Column(Text, nullable=False)
+    channel = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("channel IN ('online', 'offline')", name="platforms_channel_check"),
+        UniqueConstraint("org_id", "name", name="uq_platforms_org_name"),
+    )
+    
+    organization = relationship("Organization", back_populates="platforms")
+    orders = relationship("Order", back_populates="platform")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    
+    order_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.org_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=False)
+    channel = Column(Text, nullable=True)
+    platform_id = Column(UUID(as_uuid=True), ForeignKey("platforms.platform_id", ondelete="SET NULL"), nullable=True)
+    status = Column(Text, nullable=False, default="created")
+    total_price = Column(Numeric(10, 2), nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("channel IN ('online', 'offline') OR channel IS NULL", name="orders_channel_check"),
+        CheckConstraint("status IN ('created', 'completed', 'shipped', 'closed', 'canceled')", name="orders_status_check"),
+        CheckConstraint("total_price >= 0", name="orders_total_price_check"),
+    )
+    
+    organization = relationship("Organization", back_populates="orders")
+    user = relationship("User", back_populates="orders")
+    platform = relationship("Platform", back_populates="orders")
+    order_lines = relationship("OrderLine", back_populates="order", cascade="all, delete-orphan")
+
+
+class OrderLine(Base):
+    __tablename__ = "order_lines"
+    
+    order_line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.product_id", ondelete="RESTRICT"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_cost = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+    subtotal = Column(Numeric(10, 2), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="order_lines_quantity_check"),
+        CheckConstraint("unit_cost >= 0", name="order_lines_unit_cost_check"),
+        CheckConstraint("unit_price >= 0", name="order_lines_unit_price_check"),
+        CheckConstraint("subtotal >= 0", name="order_lines_subtotal_check"),
+    )
+    
+    order = relationship("Order", back_populates="order_lines")
+    product = relationship("Product", back_populates="order_lines")
 
 

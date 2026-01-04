@@ -8,6 +8,9 @@ import type {
   ProductSubtype,
   Product,
   Sale,
+  Platform,
+  Order,
+  OrderLine,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -254,5 +257,39 @@ export const salesApi = {
   getById: (saleId: string) => api.get<Sale>(`/sales/${saleId}`),
   create: (orgId: string, data: { product_id: string; quantity: number; unit_price: string; notes?: string }) =>
     api.post<Sale>(`/sales/?org_id=${orgId}`, data),
+};
+
+// Platforms
+export const platformsApi = {
+  getAll: (orgId: string) => api.get<Platform[]>(`/platforms/org/${orgId}`),
+  getById: (platformId: string) => api.get<Platform>(`/platforms/${platformId}`),
+  create: (data: { org_id: string; name: string; channel: 'online' | 'offline' }) =>
+    api.post<Platform>('/platforms/', data),
+  update: (platformId: string, data: { name?: string; channel?: 'online' | 'offline' }) =>
+    api.patch<Platform>(`/platforms/${platformId}`, data),
+  delete: (platformId: string) => api.delete(`/platforms/${platformId}`),
+};
+
+// Orders
+export const ordersApi = {
+  getAll: (orgId: string, skip?: number, limit?: number) => {
+    const params: any = {};
+    if (skip !== undefined) params.skip = skip;
+    if (limit !== undefined) params.limit = limit;
+    return api.get<Order[]>(`/orders/org/${orgId}`, { params });
+  },
+  getById: (orderId: string) => api.get<Order>(`/orders/${orderId}`),
+  create: (data: {
+    org_id: string;
+    user_id: string;
+    channel?: 'online' | 'offline';
+    platform_id?: string;
+    notes?: string;
+    order_lines: Array<{ product_id: string; quantity: number; unit_price: string }>;
+  }) => api.post<Order>('/orders/', data),
+  updateStatus: (orderId: string, status: 'created' | 'completed' | 'shipped' | 'closed' | 'canceled') =>
+    api.patch<Order>(`/orders/${orderId}/status`, { status }),
+  update: (orderId: string, data: { notes?: string }) =>
+    api.patch<Order>(`/orders/${orderId}`, data),
 };
 

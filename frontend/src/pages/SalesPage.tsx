@@ -2,19 +2,32 @@ import { useState, useEffect } from 'react';
 import { useOrg } from '../contexts/OrgContext';
 import { salesApi, productsApi } from '../services/api';
 import { Sale, Product } from '../types';
-import { Plus, DollarSign, Calendar, Package } from 'lucide-react';
+import { Plus, DollarSign, Calendar, Package, ExternalLink } from 'lucide-react';
 import SaleModal from '../components/sales/SaleModal';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 type SaleSortOption = 'quantity' | 'amount' | 'date';
 
 const SalesPage = () => {
   const { currentOrg } = useOrg();
+  const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState<SaleSortOption>('date');
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Extract order_id from sale notes (format: "Order <order_id>" or "Order <order_id>\n...")
+  const extractOrderId = (notes: string | undefined | null): string | null => {
+    if (!notes) return null;
+    const match = notes.match(/^Order\s+([a-f0-9-]{36})/i);
+    return match ? match[1] : null;
+  };
+
+  const handleOrderLinkClick = (orderId: string) => {
+    navigate(`/orders?order_id=${orderId}`);
+  };
 
   useEffect(() => {
     if (currentOrg) {
@@ -164,34 +177,62 @@ const SalesPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Notes
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sortedSales().map((sale) => (
-                <tr key={sale.txn_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      {format(new Date(sale.created_at), 'MMM dd, yyyy')}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {getProductName(sale.product_id)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {sale.qty}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${parseFloat(sale.unit_price_for_sale).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    ${parseFloat(sale.total_revenue).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {sale.notes || '-'}
-                  </td>
-                </tr>
-              ))}
+              {sortedSales().map((sale) => {
+                const orderId = extractOrderId(sale.notes);
+                return (
+                  <tr key={sale.txn_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        {format(new Date(sale.created_at), 'MMM dd, yyyy')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {getProductName(sale.product_id)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {sale.qty}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${parseFloat(sale.unit_price_for_sale).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                      ${parseFloat(sale.total_revenue).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                      {orderId ? (
+                        <span className="truncate block" title={sale.notes || ''}>
+                          {sale.notes?.replace(/^Order\s+[a-f0-9-]{36}/i, '').trim() || '-'}
+                        </span>
+                      ) : (
+                        <span className="truncate block" title={sale.notes || ''}>
+                          {sale.notes || '-'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {orderId ? (
+                        <button
+                          onClick={() => handleOrderLinkClick(orderId)}
+                          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
+                          title={`View Order ${orderId}`}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View Order
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -3,8 +3,284 @@ BEGIN;
 ---------------------------------------------------------------------
 -- 6) Sales and Orders
 -- Sales are tracked via product_transactions with txn_type='sale'
--- All sales use product_transactions directly
+-- Orders are created from cart checkout, and record_sale is called when order status is 'closed'
 ---------------------------------------------------------------------
+
+---------------------------------------------------------------------
+-- Platforms table (org-scoped, user-editable)
+-- Users can create/edit platforms for their organization
+---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS platforms (
+  platform_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  channel TEXT NOT NULL CHECK (channel IN ('online', 'offline')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_platforms_org_name UNIQUE (org_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_platforms_org_id ON platforms(org_id);
+CREATE INDEX IF NOT EXISTS idx_platforms_channel ON platforms(channel);
+
+---------------------------------------------------------------------
+-- Orders table
+-- Orders are created from cart checkout
+-- Status: created (default), completed, shipped, closed, canceled
+---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS orders (
+  order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE SET NULL,
+  channel TEXT CHECK (channel IN ('online', 'offline')),
+  platform_id UUID REFERENCES platforms(platform_id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'completed', 'shipped', 'closed', 'canceled')),
+  total_price NUMERIC(10,2) NOT NULL CHECK (total_price >= 0),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_org_id ON orders(org_id);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+
+---------------------------------------------------------------------
+-- Order lines table
+-- Records products, quantities, prices for each order
+---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS order_lines (
+  order_line_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE RESTRICT,
+  quantity INT NOT NULL CHECK (quantity > 0),
+  unit_cost NUMERIC(10,2) NOT NULL CHECK (unit_cost >= 0),
+  unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0),
+  subtotal NUMERIC(10,2) NOT NULL CHECK (subtotal >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_lines_order_id ON order_lines(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_lines_product_id ON order_lines(product_id);
+
+---------------------------------------------------------------------
+-- create_order(org_id, user_id, channel, platform_id, notes, order_lines_json) -> returns order_id
+--
+-- Behavior:
+--  1) Validate order lines
+--  2) Calculate total_price from order lines
+--  3) Lock product rows FOR UPDATE (concurrency safety)
+--  4) Check sufficient inventory for all products
+--  5) Reserve inventory (decrease products.quantity)
+--  6) Create order and order_lines
+--
+-- Notes:
+--  - order_lines_json should be JSON array: [{"product_id": "...", "quantity": 1, "unit_price": 10.00}, ...]
+--  - Inventory is reserved when order is created (status='created')
+--  - If order is canceled, inventory is restored
+--  - record_sale is called when order status changes to 'closed'
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION create_order(
+  p_org_id UUID,
+  p_user_id UUID,
+  p_channel TEXT,
+  p_order_lines_json JSONB,
+  p_platform_id UUID DEFAULT NULL,
+  p_notes TEXT DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_order_id UUID;
+  v_total_price NUMERIC(10,2) := 0;
+  v_line JSONB;
+  v_product_id UUID;
+  v_quantity INT;
+  v_unit_price NUMERIC(10,2);
+  v_unit_cost NUMERIC(10,2);
+  v_subtotal NUMERIC(10,2);
+BEGIN
+  -- Validate channel
+  IF p_channel IS NOT NULL AND p_channel NOT IN ('online', 'offline') THEN
+    RAISE EXCEPTION 'Channel must be "online" or "offline"';
+  END IF;
+
+  -- Validate order lines
+  IF p_order_lines_json IS NULL OR jsonb_array_length(p_order_lines_json) = 0 THEN
+    RAISE EXCEPTION 'Order must have at least one line item';
+  END IF;
+
+  -- Calculate total price and validate/check inventory
+  FOR v_line IN SELECT * FROM jsonb_array_elements(p_order_lines_json)
+  LOOP
+    v_product_id := (v_line->>'product_id')::UUID;
+    v_quantity := (v_line->>'quantity')::INT;
+    v_unit_price := (v_line->>'unit_price')::NUMERIC;
+    
+    IF v_product_id IS NULL OR v_quantity IS NULL OR v_quantity <= 0 THEN
+      RAISE EXCEPTION 'Invalid order line: product_id and quantity > 0 are required';
+    END IF;
+    
+    IF v_unit_price IS NULL OR v_unit_price < 0 THEN
+      RAISE EXCEPTION 'Invalid order line: unit_price must be >= 0';
+    END IF;
+
+    -- Lock product row for update (concurrency safety)
+    PERFORM 1
+    FROM products
+    WHERE product_id = v_product_id
+      AND org_id = p_org_id
+    FOR UPDATE;
+
+    -- Check sufficient inventory
+    IF NOT EXISTS (
+      SELECT 1
+      FROM products
+      WHERE product_id = v_product_id
+        AND org_id = p_org_id
+        AND quantity >= v_quantity
+    ) THEN
+      RAISE EXCEPTION 'Insufficient product inventory for product % (qty=%)', v_product_id, v_quantity;
+    END IF;
+
+    -- Get unit cost (for order line recording)
+    SELECT COALESCE(calculate_product_total_cost(v_product_id), 0) INTO v_unit_cost;
+    IF v_unit_cost IS NULL OR v_unit_cost = 0 THEN
+      SELECT COALESCE(total_cost, 0) INTO v_unit_cost
+      FROM products
+      WHERE product_id = v_product_id;
+    END IF;
+
+    v_subtotal := v_quantity * v_unit_price;
+    v_total_price := v_total_price + v_subtotal;
+  END LOOP;
+
+  -- Create order
+  INSERT INTO orders (org_id, user_id, channel, platform_id, status, total_price, notes)
+  VALUES (p_org_id, p_user_id, p_channel, p_platform_id, 'created', v_total_price, p_notes)
+  RETURNING order_id INTO v_order_id;
+
+  -- Create order lines and reserve inventory
+  FOR v_line IN SELECT * FROM jsonb_array_elements(p_order_lines_json)
+  LOOP
+    v_product_id := (v_line->>'product_id')::UUID;
+    v_quantity := (v_line->>'quantity')::INT;
+    v_unit_price := (v_line->>'unit_price')::NUMERIC;
+    
+    -- Get unit cost
+    SELECT COALESCE(calculate_product_total_cost(v_product_id), 0) INTO v_unit_cost;
+    IF v_unit_cost IS NULL OR v_unit_cost = 0 THEN
+      SELECT COALESCE(total_cost, 0) INTO v_unit_cost
+      FROM products
+      WHERE product_id = v_product_id;
+    END IF;
+
+    v_subtotal := v_quantity * v_unit_price;
+
+    -- Insert order line
+    INSERT INTO order_lines (order_id, product_id, quantity, unit_cost, unit_price, subtotal)
+    VALUES (v_order_id, v_product_id, v_quantity, v_unit_cost, v_unit_price, v_subtotal);
+
+    -- Reserve inventory (decrease quantity)
+    UPDATE products
+    SET quantity = quantity - v_quantity,
+        updated_at = now()
+    WHERE product_id = v_product_id
+      AND org_id = p_org_id;
+  END LOOP;
+
+  RETURN v_order_id;
+END;
+$$;
+
+---------------------------------------------------------------------
+-- update_order_status(order_id, new_status) -> returns order_id
+--
+-- Behavior:
+--  1) Validate status transition
+--  2) If new_status is 'canceled', restore inventory (increase products.quantity)
+--  3) If new_status is 'closed', call record_sale for each order line
+--  4) Update order status and updated_at
+--
+-- Notes:
+--  - Only 'created' orders can be canceled
+--  - 'closed' status triggers record_sale for each line item
+--  - Inventory is restored when canceled
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_order_status(
+  p_order_id UUID,
+  p_new_status TEXT
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_org_id UUID;
+  v_old_status TEXT;
+  v_line RECORD;
+BEGIN
+  -- Validate new status
+  IF p_new_status NOT IN ('created', 'completed', 'shipped', 'closed', 'canceled') THEN
+    RAISE EXCEPTION 'Invalid status: %', p_new_status;
+  END IF;
+
+  -- Get order details
+  SELECT org_id, status INTO v_org_id, v_old_status
+  FROM orders
+  WHERE order_id = p_order_id;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Order % not found', p_order_id;
+  END IF;
+
+  -- Handle status transitions
+  IF p_new_status = 'canceled' THEN
+    -- Only allow canceling orders that are not already closed or canceled
+    IF v_old_status = 'closed' THEN
+      RAISE EXCEPTION 'Cannot cancel a closed order';
+    END IF;
+    IF v_old_status = 'canceled' THEN
+      RAISE EXCEPTION 'Order is already canceled';
+    END IF;
+
+    -- Restore inventory for all order lines (inventory was reserved when order was created)
+    FOR v_line IN SELECT product_id, quantity FROM order_lines WHERE order_id = p_order_id
+    LOOP
+      UPDATE products
+      SET quantity = quantity + v_line.quantity,
+          updated_at = now()
+      WHERE product_id = v_line.product_id
+        AND org_id = v_org_id;
+    END LOOP;
+
+  ELSIF p_new_status = 'closed' THEN
+    -- Only allow closing non-canceled orders
+    IF v_old_status = 'canceled' THEN
+      RAISE EXCEPTION 'Cannot close a canceled order';
+    END IF;
+
+    -- Create product_transactions for each order line (only if not already closed)
+    -- Note: Inventory is already reserved when order is created, so we don't decrease it again
+    IF v_old_status != 'closed' THEN
+      FOR v_line IN SELECT ol.product_id, ol.quantity, ol.unit_price, ol.unit_cost FROM order_lines ol WHERE ol.order_id = p_order_id
+      LOOP
+        -- Insert product transaction with sale type (inventory already reserved, so no quantity update)
+        INSERT INTO product_transactions (org_id, txn_type, product_id, qty, unit_price_for_sale, unit_cost_at_sale, notes)
+        VALUES (v_org_id, 'sale', v_line.product_id, v_line.quantity, v_line.unit_price, v_line.unit_cost, 'Order ' || p_order_id::TEXT);
+      END LOOP;
+    END IF;
+  END IF;
+
+  -- Update order status
+  UPDATE orders
+  SET status = p_new_status,
+      updated_at = now()
+  WHERE order_id = p_order_id;
+
+  RETURN p_order_id;
+END;
+$$;
 
 ---------------------------------------------------------------------
 -- record_sale(product_id, quantity, unit_price, notes) -> returns txn_id
@@ -21,6 +297,9 @@ BEGIN;
 --  - Uses org_id from products to scope the transaction
 --  - Returns product_transaction.txn_id (not sale_id)
 --  - Sales are now tracked directly in product_transactions
+--  - This function is called when order status changes to 'closed'
+--  - Note: inventory is already reserved when order is created, but we still
+--    need to check/update here for safety (in case order was created but inventory changed)
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION record_sale(
   p_product_id UUID,

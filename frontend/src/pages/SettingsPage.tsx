@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrg } from '../contexts/OrgContext';
-import { User, Building2, LogOut, DollarSign } from 'lucide-react';
+import { User, Building2, LogOut, DollarSign, Globe, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { organizationsApi } from '../services/api';
+import { organizationsApi, platformsApi } from '../services/api';
+import { Platform } from '../types';
+import PlatformModal from '../components/platforms/PlatformModal';
 
 const SettingsPage = () => {
   const { user, logout } = useAuth();
@@ -19,6 +21,13 @@ const SettingsPage = () => {
   const [isSavingCurrency, setIsSavingCurrency] = useState(false);
   const [currencyMessage, setCurrencyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Platform management state
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [loadingPlatforms, setLoadingPlatforms] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
+  const [deletingPlatform, setDeletingPlatform] = useState<string | null>(null);
+
   // Initialize form data when currentOrg changes
   useEffect(() => {
     if (currentOrg) {
@@ -27,8 +36,53 @@ const SettingsPage = () => {
         additional_currency: currentOrg.additional_currency || '',
         exchange_rate: currentOrg.exchange_rate || '1.0',
       });
+      loadPlatforms();
     }
   }, [currentOrg]);
+
+  const loadPlatforms = async () => {
+    if (!currentOrg) return;
+    setLoadingPlatforms(true);
+    try {
+      const response = await platformsApi.getAll(currentOrg.org_id);
+      setPlatforms(response.data);
+    } catch (error) {
+      console.error('Failed to load platforms:', error);
+    } finally {
+      setLoadingPlatforms(false);
+    }
+  };
+
+  const handleCreatePlatform = () => {
+    setSelectedPlatform(null);
+    setShowPlatformModal(true);
+  };
+
+  const handleEditPlatform = (platform: Platform) => {
+    setSelectedPlatform(platform);
+    setShowPlatformModal(true);
+  };
+
+  const handleDeletePlatform = async (platformId: string) => {
+    if (!confirm('Are you sure you want to delete this platform? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingPlatform(platformId);
+    try {
+      await platformsApi.delete(platformId);
+      await loadPlatforms();
+    } catch (error: any) {
+      console.error('Failed to delete platform:', error);
+      alert(error.response?.data?.detail || 'Failed to delete platform');
+    } finally {
+      setDeletingPlatform(null);
+    }
+  };
+
+  const handlePlatformSave = () => {
+    loadPlatforms();
+  };
 
   const handleLogout = () => {
     logout();
@@ -144,6 +198,95 @@ const SettingsPage = () => {
             </button>
           </div>
         </div>
+
+        {/* Platform Management */}
+        {currentOrg && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 p-3 rounded-lg">
+                  <Globe className="w-6 h-6 text-purple-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900">Platforms</h2>
+              </div>
+              <button
+                onClick={handleCreatePlatform}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Platform
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Manage your sales platforms. Channels are fixed (online/offline), but you can create custom platform names for your store.
+            </p>
+            {loadingPlatforms ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+              </div>
+            ) : platforms.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Globe className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                <p>No platforms yet. Create your first platform to get started.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Channel
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {platforms.map((platform) => (
+                      <tr key={platform.platform_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {platform.name}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            platform.channel === 'online' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {platform.channel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleEditPlatform(platform)}
+                              className="text-primary-600 hover:text-primary-700 p-1"
+                              title="Edit platform"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlatform(platform.platform_id)}
+                              disabled={deletingPlatform === platform.platform_id}
+                              className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete platform"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Currency Settings */}
         {currentOrg && (
@@ -262,6 +405,18 @@ const SettingsPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Platform Modal */}
+      {showPlatformModal && (
+        <PlatformModal
+          platform={selectedPlatform}
+          onClose={() => {
+            setShowPlatformModal(false);
+            setSelectedPlatform(null);
+          }}
+          onSave={handlePlatformSave}
+        />
+      )}
     </div>
   );
 };

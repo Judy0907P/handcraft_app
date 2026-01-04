@@ -418,3 +418,86 @@ class ProductStatusLabelResponse(ProductStatusLabelBase):
     class Config:
         from_attributes = True
 
+
+# Platform Schemas
+class PlatformBase(BaseModel):
+    name: str
+    channel: str  # 'online' or 'offline'
+
+
+class PlatformCreate(PlatformBase):
+    org_id: UUID
+
+
+class PlatformUpdate(BaseModel):
+    name: Optional[str] = None
+    channel: Optional[str] = None  # 'online' or 'offline'
+
+
+class PlatformResponse(PlatformBase):
+    platform_id: UUID
+    org_id: UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Order Line Schemas
+class OrderLineBase(BaseModel):
+    product_id: UUID
+    quantity: int = Field(gt=0)
+    unit_cost: Decimal = Field(ge=0)
+    unit_price: Decimal = Field(ge=0)
+    subtotal: Decimal = Field(ge=0)
+
+
+class OrderLineCreate(BaseModel):
+    product_id: UUID
+    quantity: int = Field(gt=0)
+    unit_price: Decimal = Field(ge=0)
+
+
+class OrderLineResponse(OrderLineBase):
+    order_line_id: UUID
+    order_id: UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Order Schemas
+class OrderBase(BaseModel):
+    channel: Optional[str] = None  # 'online' or 'offline'
+    platform_id: Optional[UUID] = None
+    status: str = "created"  # 'created', 'completed', 'shipped', 'closed', 'canceled'
+    total_price: Decimal = Field(ge=0)
+    notes: Optional[str] = None
+
+
+class OrderCreate(BaseModel):
+    org_id: UUID
+    user_id: UUID
+    channel: Optional[str] = None  # 'online' or 'offline'
+    platform_id: Optional[UUID] = None
+    notes: Optional[str] = None
+    order_lines: List[OrderLineCreate]
+
+
+class OrderUpdate(BaseModel):
+    status: Optional[str] = None  # 'created', 'completed', 'shipped', 'closed', 'canceled'
+    notes: Optional[str] = None
+
+
+class OrderResponse(OrderBase):
+    order_id: UUID
+    org_id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    order_lines: Optional[List[OrderLineResponse]] = None
+    
+    class Config:
+        from_attributes = True
+

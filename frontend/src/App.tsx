@@ -10,6 +10,7 @@ import HomePage from './pages/HomePage';
 import PartsPage from './pages/PartsPage';
 import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
+import OrdersPage from './pages/OrdersPage';
 import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -43,6 +44,7 @@ function App() {
               <Route path="parts" element={<PartsPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="cart" element={<CartPage />} />
+              <Route path="orders" element={<OrdersPage />} />
               <Route path="sales" element={<SalesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

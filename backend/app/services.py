@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text, bindparam, String, Integer
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, NUMERIC
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, NUMERIC, JSONB
 from uuid import UUID
 from decimal import Decimal
-from typing import Optional
-from app.models import Part, Product, ProductTransaction, PartTransaction, RecipeLine
-from app.schemas import PartCreate, ProductCreate, SaleCreate, BuildProductRequest
+from typing import Optional, List
+import json
+from app.models import Part, Product, ProductTransaction, PartTransaction, RecipeLine, Platform, Order, OrderLine
+from app.schemas import PartCreate, ProductCreate, SaleCreate, BuildProductRequest, PlatformCreate, OrderCreate, OrderLineCreate
 
 
 def create_part(db: Session, part: PartCreate) -> Part:
@@ -399,4 +400,122 @@ def adjust_part_inventory(
         "new_unit_cost": part.unit_cost,
         "message": f"Successfully recorded {txn_type}: {qty} units. New stock: {part.stock}, Average cost: ${part.unit_cost:.2f}"
     }
+
+
+def create_platform(db: Session, platform: PlatformCreate) -> Platform:
+    """Create a new platform"""
+    db_platform = Platform(
+        org_id=platform.org_id,
+        name=platform.name,
+        channel=platform.channel
+    )
+    db.add(db_platform)
+    db.commit()
+    db.refresh(db_platform)
+    return db_platform
+
+
+def get_platform(db: Session, platform_id: UUID) -> Platform:
+    """Get a platform by ID"""
+    return db.query(Platform).filter(Platform.platform_id == platform_id).first()
+
+
+def get_platforms_by_org(db: Session, org_id: UUID) -> List[Platform]:
+    """Get all platforms for an organization"""
+    return db.query(Platform).filter(Platform.org_id == org_id).order_by(Platform.name).all()
+
+
+def update_platform(db: Session, platform_id: UUID, platform_update: dict) -> Platform:
+    """Update a platform"""
+    db_platform = db.query(Platform).filter(Platform.platform_id == platform_id).first()
+    if not db_platform:
+        return None
+    
+    for key, value in platform_update.items():
+        if value is not None:
+            setattr(db_platform, key, value)
+    
+    db.commit()
+    db.refresh(db_platform)
+    return db_platform
+
+
+def delete_platform(db: Session, platform_id: UUID) -> bool:
+    """Delete a platform"""
+    db_platform = db.query(Platform).filter(Platform.platform_id == platform_id).first()
+    if not db_platform:
+        return False
+    
+    db.delete(db_platform)
+    db.commit()
+    return True
+
+
+def create_order(db: Session, order: OrderCreate) -> Order:
+    """Create an order using the database function"""
+    # Convert order lines to JSONB format
+    order_lines_json = [
+        {
+            "product_id": str(line.product_id),
+            "quantity": line.quantity,
+            "unit_price": str(line.unit_price)
+        }
+        for line in order.order_lines
+    ]
+    order_lines_jsonb = json.dumps(order_lines_json)
+    
+    # Call the database function
+    result = db.execute(
+        text("""
+            SELECT create_order(
+                CAST(:org_id AS UUID),
+                CAST(:user_id AS UUID),
+                CAST(:channel AS TEXT),
+                CAST(:order_lines_json AS JSONB),
+                CAST(:platform_id AS UUID),
+                CAST(:notes AS TEXT)
+            )
+        """),
+        {
+            "org_id": str(order.org_id),
+            "user_id": str(order.user_id),
+            "channel": order.channel,
+            "order_lines_json": order_lines_jsonb,
+            "platform_id": str(order.platform_id) if order.platform_id else None,
+            "notes": order.notes
+        }
+    )
+    order_id = result.scalar()
+    db.commit()
+    
+    # Get the created order with order lines
+    db_order = db.query(Order).filter(Order.order_id == order_id).first()
+    return db_order
+
+
+def get_order(db: Session, order_id: UUID) -> Order:
+    """Get an order by ID"""
+    return db.query(Order).filter(Order.order_id == order_id).first()
+
+
+def get_orders_by_org(db: Session, org_id: UUID, skip: int = 0, limit: int = 100) -> List[Order]:
+    """Get all orders for an organization"""
+    return db.query(Order).filter(Order.org_id == org_id).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def update_order_status(db: Session, order_id: UUID, new_status: str) -> Order:
+    """Update order status using the database function"""
+    result = db.execute(
+        text("SELECT update_order_status(CAST(:order_id AS UUID), CAST(:new_status AS TEXT))"),
+        {
+            "order_id": str(order_id),
+            "new_status": new_status
+        }
+    )
+    result.scalar()
+    db.commit()
+    
+    # Get the updated order
+    db_order = db.query(Order).filter(Order.order_id == order_id).first()
+    return db_order
 

@@ -115,3 +115,36 @@ export interface ProductWithSubtype extends Product {
 export type SortOption = 'stock' | 'name' | 'updated';
 export type SortDirection = 'asc' | 'desc';
 
+export interface Platform {
+  platform_id: string;
+  org_id: string;
+  name: string;
+  channel: 'online' | 'offline';
+  created_at: string;
+}
+
+export interface OrderLine {
+  order_line_id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost: string;
+  unit_price: string;
+  subtotal: string;
+  created_at: string;
+}
+
+export interface Order {
+  order_id: string;
+  org_id: string;
+  user_id: string;
+  channel: 'online' | 'offline' | null;
+  platform_id: string | null;
+  status: 'created' | 'completed' | 'shipped' | 'closed' | 'canceled';
+  total_price: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  order_lines?: OrderLine[];
+}
+
