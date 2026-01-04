@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: craftflow-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-craftflow_db}
+      POSTGRES_USER: ${POSTGRES_USER:-craftflow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-craftflow_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema:/docker-entrypoint-initdb.d/schema:ro
+      - ./db/seeds:/docker-entrypoint-initdb.d/seeds:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-craftflow_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - craftflow-network
+    restart: unless-stopped
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: craftflow-minio
+    command: server /data --console-address ":9001"
+    # Note: MinIO health endpoint might vary, using basic connectivity check
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000 || exit 1"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - craftflow-network
+    restart: unless-stopped
+
+  # MinIO Client for bucket initialization
+  minio-setup:
+    image: minio/mc:latest
+    container_name: craftflow-minio-setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc mb myminio/${S3_BUCKET:-craftflow-uploads} || true;
+      /usr/bin/mc anonymous set download myminio/${S3_BUCKET:-craftflow-uploads};
+      exit 0;
+      "
+    networks:
+      - craftflow-network
+    restart: "no"
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: craftflow-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-craftflow_user}:${POSTGRES_PASSWORD:-craftflow_password}@postgres:5432/${POSTGRES_DB:-craftflow_db}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-key-in-production}
+      STORAGE_TYPE: minio
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-craftflow-uploads}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_USE_SSL: "false"
+      BASE_URL: ${BASE_URL:-https://yourdomain.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend/uploads:/app/uploads  # Fallback for local storage if needed
+    networks:
+      - craftflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: craftflow-frontend
+    depends_on:
+      - backend
+    networks:
+      - craftflow-network
+    restart: unless-stopped
+
+  # Caddy Reverse Proxy
+  caddy:
+    image: caddy:2-alpine
+    container_name: craftflow-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # For HTTP/3
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+      - minio
+    networks:
+      - craftflow-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  craftflow-network:
+    driver: bridge
+

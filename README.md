@@ -123,11 +123,19 @@ handcraft_app/
 4. Set up database connection:
    Create a `.env` file in the `backend/` directory:
    ```bash
-   DATABASE_URL=postgresql://username:password@localhost/handcraft_db
+   DATABASE_URL=postgresql://username:password@localhost/craftflow_db
    ```
 
 5. Set up the database schema:
    See the `db/schema/` directory for SQL schema files. Run them in order.
+   
+   For quick setup, you can use the refresh script:
+   ```bash
+   ./scripts/refresh_db.sh
+   ```
+   **⚠️ Warning**: This will drop and recreate the database, deleting all existing data.
+   
+   See `scripts/README.md` for more information about database management scripts.
 
 6. Start the server:
    ```bash

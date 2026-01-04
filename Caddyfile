@@ -1,0 +1,50 @@
+# Replace 'yourdomain.com' with your actual domain name
+# Caddy will automatically obtain SSL certificates from Let's Encrypt
+
+# Option 1: Using Cloudflare DNS challenge (recommended if you have API token)
+# yourdomain.com {
+#     tls {
+#         dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+#     }
+#
+# Option 2: Using HTTP challenge (works if Cloudflare proxy is disabled or HTTP challenge is allowed)
+# Option 3: Let Cloudflare handle SSL (if using Cloudflare proxy - orange cloud)
+
+yourdomain.com {
+    # If using Cloudflare DNS challenge, uncomment the following:
+    # tls {
+    #     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    # }
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+
+    # Reverse proxy for API
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Serve frontend static files
+    handle {
+        reverse_proxy frontend:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# Redirect www to non-www (optional, uncomment if needed)
+# www.yourdomain.com {
+#     redir https://yourdomain.com{uri} permanent
+# }
+

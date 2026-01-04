@@ -88,12 +88,12 @@ pip install -r requirements.txt
 Create a `.env` file in the `backend/` directory:
 
 ```bash
-DATABASE_URL=postgresql://username:password@localhost/handcraft_db
+DATABASE_URL=postgresql://username:password@localhost/craftflow_db
 ```
 
 Or for local development without credentials:
 ```bash
-DATABASE_URL=postgresql://localhost/handcraft_db
+DATABASE_URL=postgresql://localhost/craftflow_db
 ```
 
 ### 3. Set Up Database Schema

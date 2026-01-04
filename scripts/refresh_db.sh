@@ -1,15 +1,18 @@
 #!/bin/bash
 
-# Database refresh script for handcraft_app
+# Database refresh script for CraftFlow
 # This script drops and recreates the database, then runs all schema files and seed data
+# Works for local development (direct PostgreSQL connection)
 
 set -e  # Exit on error
 
-# Configuration
-DB_NAME="handcraft_db"
-DB_USER="jiayizhai"
-SCHEMA_DIR="db/schema"
-SEEDS_DIR="db/seeds"
+# Configuration - Use environment variables with safe defaults for local development
+DB_NAME="${POSTGRES_DB:-craftflow_db}"
+DB_USER="${POSTGRES_USER:-${USER}}"
+DB_HOST="${POSTGRES_HOST:-localhost}"
+DB_PORT="${POSTGRES_PORT:-5432}"
+SCHEMA_DIR="${SCHEMA_DIR:-db/schema}"
+SEEDS_DIR="${SEEDS_DIR:-db/seeds}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -37,22 +40,32 @@ if [ ! -d "$SCHEMA_DIR" ]; then
     exit 1
 fi
 
+# Confirm destructive operation
+print_warn "⚠️  WARNING: This will DROP and recreate the database: $DB_NAME"
+print_warn "⚠️  All data will be permanently lost!"
+echo ""
+read -p "Are you sure you want to continue? (type 'yes' to confirm): " confirmation
+if [ "$confirmation" != "yes" ]; then
+    print_info "Operation cancelled."
+    exit 0
+fi
+
 print_info "Starting database refresh for $DB_NAME..."
 
 # Step 1: Terminate all connections to the database
 print_info "Terminating existing connections to $DB_NAME..."
-psql -U "$DB_USER" -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" 2>/dev/null || true
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" 2>/dev/null || true
 
 # Step 2: Drop the database
 print_info "Dropping database $DB_NAME..."
-psql -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;" || {
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;" || {
     print_error "Failed to drop database"
     exit 1
 }
 
 # Step 3: Create the database
 print_info "Creating database $DB_NAME..."
-psql -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" || {
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" || {
     print_error "Failed to create database"
     exit 1
 }
@@ -63,7 +76,7 @@ for schema_file in "$SCHEMA_DIR"/[0-9][0-9]_*.sql; do
     if [ -f "$schema_file" ]; then
         filename=$(basename "$schema_file")
         print_info "  Running $filename..."
-        psql -U "$DB_USER" -d "$DB_NAME" -f "$schema_file" || {
+        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$schema_file" || {
             print_error "Failed to run $filename"
             exit 1
         }
@@ -73,7 +86,7 @@ done
 # Step 5: Run seed data
 if [ -f "$SEEDS_DIR/seed_data.sql" ]; then
     print_info "Running seed data..."
-    psql -U "$DB_USER" -d "$DB_NAME" -f "$SEEDS_DIR/seed_data.sql" || {
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$SEEDS_DIR/seed_data.sql" || {
         print_error "Failed to run seed data"
         exit 1
     }

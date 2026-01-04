@@ -29,12 +29,12 @@ pip install -r requirements.txt
 Create a `.env` file in the `backend/` directory:
 
 ```bash
-echo "DATABASE_URL=postgresql://localhost/handcraft_db" > .env
+echo "DATABASE_URL=postgresql://localhost/craftflow_db" > .env
 ```
 
 Or with credentials:
 ```bash
-echo "DATABASE_URL=postgresql://username:password@localhost/handcraft_db" > .env
+echo "DATABASE_URL=postgresql://username:password@localhost/craftflow_db" > .env
 ```
 
 ## Step 3: Set Up Database Schema
@@ -42,7 +42,7 @@ echo "DATABASE_URL=postgresql://username:password@localhost/handcraft_db" > .env
 Make sure PostgreSQL is running and create the database:
 
 ```bash
-createdb handcraft_db
+createdb craftflow_db
 ```
 
 Then run the schema files in order from the `db/schema/` directory:
@@ -58,15 +58,17 @@ Then run the schema files in order from the `db/schema/` directory:
 
 You can run them all at once:
 ```bash
-psql handcraft_db < db/schema/00_extensions.sql
-psql handcraft_db < db/schema/01_users_and_orgs.sql
+psql craftflow_db < db/schema/00_extensions.sql
+psql craftflow_db < db/schema/01_users_and_orgs.sql
 # ... and so on
 ```
 
-Or use the refresh script if available:
+Or use the refresh script for local development:
 ```bash
-./refresh_db.sh
+./scripts/refresh_db.sh
 ```
+
+**Note**: This script will drop and recreate the database. All data will be lost!
 
 ## Step 4: Start the Server
 
@@ -172,7 +174,7 @@ curl -X POST http://localhost:8000/orders/ \
 ### Database Connection Error
 - Make sure PostgreSQL is running: `pg_isready` or `psql -l`
 - Verify `DATABASE_URL` in `.env` is correct
-- Ensure the database `handcraft_db` exists: `createdb handcraft_db`
+- Ensure the database `craftflow_db` exists: `createdb craftflow_db`
 - Check that all schema files have been loaded
 
 ### Import Errors
