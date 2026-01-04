@@ -1,25 +1,23 @@
-# Replace 'yourdomain.com' with your actual domain name
-# Caddy will automatically obtain SSL certificates from Let's Encrypt
+# Caddy configuration with environment variable support
+# Domain is read from DOMAIN environment variable (set in .env file)
+# Supports both main domain and www subdomain
 
-# Option 1: Using Cloudflare DNS challenge (recommended if you have API token)
-# yourdomain.com {
-#     tls {
-#         dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-#     }
-#
-# Option 2: Using HTTP challenge (works if Cloudflare proxy is disabled or HTTP challenge is allowed)
-# Option 3: Let Cloudflare handle SSL (if using Cloudflare proxy - orange cloud)
+# Main domain and www subdomain
+{env.DOMAIN}, www.{env.DOMAIN} {
+    # Cloudflare DNS challenge for SSL (if CLOUDFLARE_API_TOKEN is set)
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
 
-yourdomain.com {
-    # If using Cloudflare DNS challenge, uncomment the following:
-    # tls {
-    #     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-    # }
     # Logging
     log {
         output file /var/log/caddy/access.log
         format json
     }
+
+    # Redirect www to non-www (optional - uncomment if you want to redirect www to main domain)
+    # @www host www.{env.DOMAIN}
+    # redir @www https://{env.DOMAIN}{uri} permanent
 
     # Reverse proxy for API
     handle /api/* {
@@ -42,9 +40,4 @@ yourdomain.com {
         }
     }
 }
-
-# Redirect www to non-www (optional, uncomment if needed)
-# www.yourdomain.com {
-#     redir https://yourdomain.com{uri} permanent
-# }
 

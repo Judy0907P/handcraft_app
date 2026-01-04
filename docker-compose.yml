@@ -123,6 +123,7 @@ services:
       - "443:443"
       - "443:443/udp"  # For HTTP/3
     environment:
+      DOMAIN: ${DOMAIN:-yourdomain.com}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
